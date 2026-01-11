@@ -1,0 +1,49 @@
+{
+    "idols": {
+        "karina": {
+            "name_tags": "#KARINA #카리나 #カリナ",
+            "group": "aespa" 
+        },
+        "giselle": {
+            "name_tags": "#GISELLE #지젤 #ジゼル",
+            "group": "aespa"
+        },
+        "ningning": {
+            "name_tags": "#NINGNING #닝닝 #ニンニン",
+            "group": "aespa"
+        },
+        "winter": {
+            "name_tags": "#WINTER #윈터 #ウィンター",
+            "group": "aespa"
+        },
+        "chaewon": {
+            "name_tags": "#KIMCHAEWON #CHAEWON #김채원 #チェウォン",
+            "group": "le sserafim"
+        },
+        "yunjin": {
+            "name_tags": "#HUHYUNJIN #YUNJIN #허윤진 #윤진 #ホユンジン",
+            "group": "le sserafim"
+        },
+        "kazuha": {
+            "name_tags": "#KAZUHA #카즈하 #カズハ",
+            "group": "le sserafim"
+        },
+        "sakura": {
+            "name_tags": "#SAKURA #사쿠라 #宮脇咲良 #サクラ #ルセラフィム",
+            "group": "le sserafim"
+        },
+        "eunchae": {
+            "name_tags": "#HONGEUNCHAE #EUNCHAE #홍은채 #은채 #ホンウンチェ",
+            "group": "le sserafim"
+        }
+    },
+
+    "groups": {
+        "aespa": {
+            "group_tags": "#aespa #에스파 #エスパ"
+        },
+        "le sserafim": {
+            "group_tags": "#LE_SSERAFIM #르세라핌 #ルセラフィム"
+        }
+    }
+}
