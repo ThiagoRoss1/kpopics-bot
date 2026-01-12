@@ -11,4 +11,4 @@ def priority_sort(item):
     last_modified = -last_modified_raw.timestamp()
     copies = int(item.get('copies') or 0)
     
-    return (urgent, date, last_modified, copies)
+    return (urgent, date, last_modified, -copies)
