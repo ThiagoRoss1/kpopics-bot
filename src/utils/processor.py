@@ -68,7 +68,7 @@ def process_data(file_name):
             if group_tags:
                 all_group_tags.add(group_tags)
 
-    header = f"{date} 📸" if date else "📸"
+    header = f"{date} 📸\n" if date else "📸\n"
     name_tags = " ".join(all_name_tags) if all_name_tags else ""
     group_tags = " ".join(all_group_tags) if all_group_tags else ""
 
