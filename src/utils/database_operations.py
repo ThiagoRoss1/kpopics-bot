@@ -8,6 +8,9 @@ load_dotenv()
 
 db_env = os.getenv("DB_FILE")
 
+if not db_env:
+    raise RuntimeError("DB_FILE not set.")
+
 if db_env.startswith("/"):
     DB_PATH = pathlib.Path(db_env)
 

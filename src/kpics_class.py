@@ -5,6 +5,7 @@ import io
 import os
 from utils.processor import process_data
 from utils.sorter import priority_sort
+from scripts.init_db import init_db
 from utils.database_operations import log_posted_image, get_log_history, get_last_posted_image
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -32,6 +33,8 @@ class KpopBot:
 
     # Running the bot
     def run(self):
+        init_db()
+        
         self._setup_s3()
         self._setup_twitter()
 
