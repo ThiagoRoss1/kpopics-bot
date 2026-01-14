@@ -5,9 +5,19 @@ from contextlib import closing
 from dotenv import load_dotenv
 
 load_dotenv()
-DB_PATH = pathlib.Path(__file__).resolve().parent.parent / os.getenv("DB_FILE")
+
+db_env = os.getenv("DB_FILE")
+
+if db_env.startswith("/"):
+    DB_PATH = pathlib.Path(db_env)
+
+else:
+    DB_PATH = pathlib.Path(__file__).resolve().parent.parent / db_env
 
 DB_FILE = str(DB_PATH)
+
+folder_path = pathlib.Path(DB_FILE).parent
+folder_path.mkdir(parents=True, exist_ok=True)
 
 def log_posted_image(file_key, bot_name, last_idol):
     try:
