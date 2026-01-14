@@ -28,6 +28,12 @@ def process_data(file_name):
 
     base_name = re.sub(r'urgent', '', base_name, flags=re.IGNORECASE)
 
+    # Search for D1, D2, T1, T2, Q1, Q2 + tags (if on file name)
+    combo_match = re.search(r'-(D|T|Q)(\d+)', base_name) 
+    combo = combo_match.group(0)[1:].upper() if combo_match else None
+
+    base_name = re.sub(r'-(D|T|Q)(\d+)', '', base_name, flags=re.IGNORECASE).strip()
+
     raw_keys = re.findall(r'[a-zA-Z]+', base_name)
     idol_keys = [key.lower() for key in raw_keys if key.lower() in DATA['idols']]
 
@@ -78,9 +84,11 @@ def process_data(file_name):
     
     return {
         "key": file_name,
+        "idols": idol_keys,
         "date": date,
         "urgent": urgent_match,
         "copies": copies,
+        "combo": combo,
         "text": final_text
     }  
 

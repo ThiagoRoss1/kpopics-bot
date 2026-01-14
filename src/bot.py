@@ -7,7 +7,7 @@ def main():
 
     for idol_prefix in bots:
         try:
-            bot = KpopBot(idol_prefix=idol_prefix)
+            bot = KpopBot(idol_prefix=idol_prefix, active_bots=bots)
             bot.run()
 
         except Exception as e:
