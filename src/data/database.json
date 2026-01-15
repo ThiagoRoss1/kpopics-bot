@@ -1,49 +1,60 @@
 {
     "idols": {
         "karina": {
-            "name_tags": "#KARINA #카리나 #カリナ",
+            "idol_names": ["카리나", "カリナ"],
+            "name_tags": "#KARINA",
             "group": "aespa" 
         },
         "giselle": {
-            "name_tags": "#GISELLE #지젤 #ジゼル",
+            "idol_names": ["지젤", "ジゼル"],
+            "name_tags": "#GISELLE",
             "group": "aespa"
         },
         "ningning": {
-            "name_tags": "#NINGNING #닝닝 #ニンニン",
+            "idol_names": ["닝닝", "ニンニン"],
+            "name_tags": "#NINGNING",
             "group": "aespa"
         },
         "winter": {
-            "name_tags": "#WINTER #윈터 #ウィンター",
+            "idol_names": ["윈터", "ウィンター"],
+            "name_tags": "#WINTER",
             "group": "aespa"
         },
         "chaewon": {
-            "name_tags": "#KIMCHAEWON #CHAEWON #김채원 #チェウォン",
+            "idol_names": ["채원", "チェウォン"],
+            "name_tags": "#KIMCHAEWON",
             "group": "le sserafim"
         },
         "yunjin": {
-            "name_tags": "#HUHYUNJIN #YUNJIN #허윤진 #윤진 #ホユンジン",
+            "idol_names": ["허윤진", "ホユンジン"],
+            "name_tags": "#HUHYUNJIN",
             "group": "le sserafim"
         },
         "kazuha": {
-            "name_tags": "#KAZUHA #카즈하 #カズハ",
+            "idol_names": ["카즈하", "カズハ"],
+            "name_tags": "#KAZUHA",
             "group": "le sserafim"
         },
         "sakura": {
-            "name_tags": "#SAKURA #사쿠라 #宮脇咲良 #サクラ #ルセラフィム",
+            "idol_names": ["사쿠라", "宮脇咲良", "サクラ"],
+            "name_tags": "#SAKURA",
             "group": "le sserafim"
         },
         "eunchae": {
-            "name_tags": "#HONGEUNCHAE #EUNCHAE #홍은채 #은채 #ホンウンチェ",
+            "idol_names": ["홍은채", "ホンウンチェ"],
+            "name_tags": "#HONGEUNCHAE",
             "group": "le sserafim"
         }
     },
 
     "groups": {
         "aespa": {
-            "group_tags": "#aespa #에스파 #エスパ"
+            "group_names": ["에스파", "エスパ"],
+            "group_tags": "#aespa"
         },
         "le sserafim": {
-            "group_tags": "#LE_SSERAFIM #르세라핌 #ルセラフィム"
+            "group_names": ["르세라핌", "ルセラフィム"],
+            "group_tags": "#LE_SSERAFIM"
         }
     }
 }

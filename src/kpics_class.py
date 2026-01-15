@@ -88,7 +88,7 @@ class KpopBot:
             self.client_v2 = None
 
     # PHASE 2 - Search and download boto3 image after Cloudflare R2 and Twitter API setup
-    def _get_image(self):
+    def _get_image(self, target_file=None):
         try:
             search_answer = self.s3.list_objects_v2(Bucket=BUCKET_NAME)
 
@@ -103,6 +103,8 @@ class KpopBot:
                 data = process_data(obj['Key'])
 
                 if data:
+                    if target_file and data['key'] != target_file:
+                        continue
                     # future test (multiple bots): filter by idol prefix
                     is_general = self.idol_prefix == "GENERAL"
                     is_match = self.idol_prefix.lower() in data['key'].lower()

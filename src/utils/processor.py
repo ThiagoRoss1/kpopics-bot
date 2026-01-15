@@ -59,28 +59,59 @@ def process_data(file_name):
         if date_str:
             print(date_str)
 
+    count = len(idol_keys)
 
+    all_idol_names = []
     all_name_tags = []
+
+    all_group_names = []
     all_group_tags = set()
+    processed_groups = set()
 
     for key in idol_keys:
         idol_info = DATA['idols'].get(key, {"name_tags": f"#{key}", "group": None})
+
+        names = idol_info.get('idol_names', [])
+        if count <= 2:
+            all_idol_names.extend(names)
+        else:
+            if names:
+                all_idol_names.append(names[0])
+        
         if idol_info:
             all_name_tags.append(idol_info.get('name_tags', f"#{key}"))
             
             group_name = idol_info.get('group')
-            group_info = DATA['groups'].get(group_name, {"group_tags": ""} if group_name else {"group_tags": ""})
-            group_tags = group_info.get('group_tags', "")
-            if group_tags:
-                all_group_tags.add(group_tags)
+            if group_name and group_name not in processed_groups:
 
-    header = f"{date} 📸\n" if date else "📸\n"
+                group_info = DATA['groups'].get(group_name, {})
+                group_names_org = group_info.get('group_names', [])
+                group_tags = group_info.get('group_tags', "")
+
+                if group_names_org:
+                    all_group_names.append(group_names_org)
+
+                if group_tags:
+                    all_group_tags.add(group_tags)
+
+                processed_groups.add(group_name)
+
+    # Header part
+    header = f" • ".join(all_idol_names) + (f" 「{date}」 📸" if date else " 📸")
+
+    raw_group_names = [name for names in all_group_names for name in names]
+    group_names_post = " • ".join(raw_group_names) + " ✨" if raw_group_names else ""
+
     name_tags = " ".join(all_name_tags) if all_name_tags else ""
     group_tags = " ".join(all_group_tags) if all_group_tags else ""
 
     # Test after - \n must be at the end of each variable, not at final_text
-    parts = [header, name_tags, group_tags]
-    final_text = f"\n".join(part for part in parts if part).strip()
+    names = f"{header}\n{group_names_post}".strip()
+    
+    tags = f"{name_tags} {group_tags}".strip()
+     
+    parts = [names, tags]
+    final_text = f"\n\n".join(part for part in parts if part).strip()
     
     return {
         "key": file_name,
