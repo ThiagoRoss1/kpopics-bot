@@ -72,9 +72,9 @@ def process_data(file_name):
         idol_info = DATA['idols'].get(key, {"name_tags": f"#{key}", "group": None})
 
         names = idol_info.get('idol_names', [])
-        if count <= 2:
+        if count == 1:
             all_idol_names.extend(names)
-        else:
+        elif count >= 2:
             if names:
                 all_idol_names.append(names[0])
         
