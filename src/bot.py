@@ -1,17 +1,25 @@
 from kpics_class import KpopBot
 
+# Current bots (idol_prefix) in production.
+ACTIVE_BOTS = ["GENERAL"]
 
-def main():
-    # Current bots (idol_prefix) working
-    bots = ["GENERAL"]
 
-    for idol_prefix in bots:
+def run_bots(active_bots=None):
+    # Run one posting cycle for each active bot. Shared by the manual entry (main, below) and the
+    # in-process scheduler (api.main's bot-post job), so the posting logic lives in one place.
+    active_bots = active_bots or ACTIVE_BOTS
+
+    for idol_prefix in active_bots:
         try:
-            bot = KpopBot(idol_prefix=idol_prefix, active_bots=bots)
+            bot = KpopBot(idol_prefix=idol_prefix, active_bots=active_bots)
             bot.run()
 
         except Exception as e:
             print(f"Error running bot for {idol_prefix}: {e}.")
+
+
+def main():
+    run_bots(ACTIVE_BOTS)
 
 
 if __name__ == "__main__":

@@ -3,10 +3,9 @@ import tweepy
 from dotenv import load_dotenv
 import io
 import os
-from utils.processor import process_data
 from utils.sorter import priority_sort
 from scripts.init_db import init_db
-from utils.database_operations import log_posted_image, get_log_history, get_last_posted_image
+from utils.database_operations import log_posted_image, get_log_history, get_last_posted_image, get_approved_photos, set_photo_posted
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -87,41 +86,32 @@ class KpopBot:
             self.api_v1 = None
             self.client_v2 = None
 
-    # PHASE 2 - Search and download boto3 image after Cloudflare R2 and Twitter API setup
+    # PHASE 2 - Pull the approved queue from the DB (source of truth), then pick what to post.
+    # The bytes still come from R2 in _download_image; only the metadata source changed (DB rows
+    # instead of parsing the R2 file name).
     def _get_image(self, target_file=None):
         try:
-            search_answer = self.s3.list_objects_v2(Bucket=BUCKET_NAME)
-
-            if 'Contents' not in search_answer:
-                print("Bucket is empty or does not exist.")
-                return None
-            
-            print(f"Connected to Cloudflare R2 successfully, {search_answer}.") # remove search_answer after testing
-
             self.idols_list = []
-            for obj in search_answer['Contents']:
-                data = process_data(obj['Key'])
+            for data in get_approved_photos():
+                if target_file and data['key'] != target_file:
+                    continue
+                # future test (multiple bots): filter by idol prefix against the linked idols
+                # (the r2_key is now an opaque object key, not the old name-encoded metadata).
+                is_general = self.idol_prefix == "GENERAL"
+                is_match = self.idol_prefix.lower() in [idol.lower() for idol in data['idols']]
 
-                if data:
-                    if target_file and data['key'] != target_file:
-                        continue
-                    # future test (multiple bots): filter by idol prefix
-                    is_general = self.idol_prefix == "GENERAL"
-                    is_match = self.idol_prefix.lower() in data['key'].lower()
+                if is_general or is_match:
+                    self.idols_list.append(data)
 
-                    if is_general or is_match:
-                        data['last_modified'] = obj['LastModified']
-                        self.idols_list.append(data)
-            
-            if not self.idols_list or self.idols_list[0] is None:
-                print("No valid image files found in the bucket.")
+            if not self.idols_list:
+                print("No approved images found in the pipeline.")
                 return None
-            
+
             self.idols_list.sort(key=priority_sort, reverse=True)
 
             last_post = get_last_posted_image(self.idol_prefix)
             file_name = None
-            
+
             for file in self.idols_list:
                 history = get_log_history(file['key'])
                 if self.idol_prefix in history:
@@ -140,19 +130,22 @@ class KpopBot:
             if not file_name:
                 print("No new images to post found for this bot.")
                 return None
-            
-            if file_name['combo']:
+
+            # Photos from one Kpopping album (shared album_id) go out together as a single
+            # multi-image tweet, best first (ai_score, then fewest copies), capped at 4 — album_id
+            # is the automated successor to the old manual `combo` tag. A photo with no album_id
+            # (e.g. manual ingestion) posts on its own.
+            if file_name['album_id']:
                 post_pack = [file for file in self.idols_list
-                             if file.get('idols') == file_name.get('idols')
-                             and file.get('date') == file_name.get('date')
-                             and file.get('combo') == file_name.get('combo')]
-                
-                return sorted(post_pack, key=lambda x: int(x['copies']))[:4]
+                             if file.get('album_id') == file_name.get('album_id')]
+
+                post_pack.sort(key=lambda x: (-(x.get('ai_score') or 0), int(x.get('copies') or 0)))
+                return post_pack[:4]
 
             return [file_name]
-        
+
         except Exception as e:
-            print(f"Error connecting to Cloudflare R2: {e}")
+            print(f"Error building the post queue: {e}")
             return None
         
     def _download_image(self):
@@ -227,8 +220,13 @@ class KpopBot:
                             Key=filename['key']
                         )
 
+                        # Bytes are gone and every relevant bot has posted: retire the DB row too,
+                        # so the approved queue no longer points at a deleted object.
+                        if filename.get('id'):
+                            set_photo_posted(filename['id'])
+
                         print(f"Image {filename['key']} deleted successfully from R2 after tweeting.")
-                    
+
                     else:
                         missing = [bot for bot in needed_bots if bot not in history]
                         print(f"Image {filename['key']} not deleted yet. Missing bot(s): {missing}.")
@@ -250,7 +248,7 @@ class KpopBot:
             print(f"Error posting tweet: {e}")
 
 
-# Prior code 
+# Prior code
 
 # response_object = self.s3.get_object(Bucket=BUCKET_NAME, Key=file_name['key'])
 # self.image_data = response_object['Body'].read()
@@ -259,3 +257,54 @@ class KpopBot:
 # return file_name
 
 # file_name = self.idols_list[0]
+
+# Prior _get_image (Phase 1 — sourced metadata from the R2 file name via process_data, before the
+# DB became the source of truth; combo grouping came from the filename D/T/Q tag):
+# def _get_image(self, target_file=None):
+#     try:
+#         search_answer = self.s3.list_objects_v2(Bucket=BUCKET_NAME)
+#         if 'Contents' not in search_answer:
+#             print("Bucket is empty or does not exist.")
+#             return None
+#         print("Connected to Cloudflare R2 successfully.")
+#         self.idols_list = []
+#         for obj in search_answer['Contents']:
+#             data = process_data(obj['Key'])
+#             if data:
+#                 if target_file and data['key'] != target_file:
+#                     continue
+#                 is_general = self.idol_prefix == "GENERAL"
+#                 is_match = self.idol_prefix.lower() in data['key'].lower()
+#                 if is_general or is_match:
+#                     data['last_modified'] = obj['LastModified']
+#                     self.idols_list.append(data)
+#         if not self.idols_list or self.idols_list[0] is None:
+#             print("No valid image files found in the bucket.")
+#             return None
+#         self.idols_list.sort(key=priority_sort, reverse=True)
+#         last_post = get_last_posted_image(self.idol_prefix)
+#         file_name = None
+#         for file in self.idols_list:
+#             history = get_log_history(file['key'])
+#             if self.idol_prefix in history:
+#                 continue
+#             if self.idol_prefix == "GENERAL":
+#                 current_idol = ", ".join(file['idols']) if isinstance(file['idols'], list) else file['idols']
+#                 if last_post and last_post['last_idol'] == current_idol:
+#                     print(f"Skipping file {file['key']} -> posted this photo recently with GENERAL bot.")
+#                     continue
+#             file_name = file
+#             break
+#         if not file_name:
+#             print("No new images to post found for this bot.")
+#             return None
+#         if file_name['combo']:
+#             post_pack = [file for file in self.idols_list
+#                          if file.get('idols') == file_name.get('idols')
+#                          and file.get('date') == file_name.get('date')
+#                          and file.get('combo') == file_name.get('combo')]
+#             return sorted(post_pack, key=lambda x: int(x['copies']))[:4]
+#         return [file_name]
+#     except Exception as e:
+#         print(f"Error connecting to Cloudflare R2: {e}")
+#         return None

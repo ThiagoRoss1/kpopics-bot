@@ -1,8 +1,8 @@
-import sqlite3
 import os
 import pathlib
-from contextlib import closing
 from dotenv import load_dotenv
+
+from migrations.migrations import apply_migrations
 
 load_dotenv()
 
@@ -23,22 +23,9 @@ folder_path = pathlib.Path(DB_FILE).parent
 folder_path.mkdir(parents=True, exist_ok=True)
 
 def init_db():
-    
-    with closing(sqlite3.connect(DB_FILE)) as connect:
-        with connect:          
-            cursor = connect.cursor()
-
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS history (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    file_key TEXT NOT NULL,
-                    bot_name TEXT NOT NULL,
-                    posted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    last_idol TEXT,
-                    UNIQUE(file_key, bot_name)
-                )
-            """
-            )
+    # Schema is owned by the migration runner (src/migrations/*.sql); this just applies
+    # any pending migrations. Kept as init_db() so existing callers don't change.
+    apply_migrations(DB_FILE)
 
 if __name__ == "__main__":
     init_db()

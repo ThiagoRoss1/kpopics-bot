@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kpopics — Approval</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --panel-2: #1e222b; --line: #2a2f3a;
+    --text: #e6e8ec; --muted: #9aa2b1; --accent: #6ea8fe;
+    --ok: #2f9e63; --ok-hover: #35b371; --no: #c1443f; --no-hover: #d6524d;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  }
+  header {
+    position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 8px;
+    padding: 12px 20px; background: rgba(15,17,21,.85); backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line); flex-wrap: wrap;
+  }
+  header h1 { font-size: 17px; margin: 0 12px 0 0; font-weight: 650; letter-spacing: .2px; }
+  header .count { color: var(--muted); font-size: 13px; }
+  header .spacer { flex: 1; }
+  .tabs { display: flex; gap: 4px; }
+  .tab { background: transparent; border: 1px solid transparent; color: var(--muted);
+    padding: 6px 12px; border-radius: 8px; cursor: pointer; font: inherit; }
+  .tab:hover { color: var(--text); }
+  .tab.active { background: var(--panel-2); border-color: var(--line); color: var(--text); }
+  button {
+    font: inherit; border: 1px solid var(--line); background: var(--panel-2); color: var(--text);
+    padding: 7px 13px; border-radius: 8px; cursor: pointer;
+  }
+  button:hover { border-color: #3a4150; }
+  button:disabled { opacity: .5; cursor: default; }
+  .main { max-width: 1200px; margin: 0 auto; padding: 22px 20px 60px; }
+  .grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+    display: flex; flex-direction: column; transition: opacity .2s, transform .2s;
+  }
+  .card.leaving { opacity: 0; transform: scale(.97); }
+  .thumb {
+    aspect-ratio: 3/4; background: var(--panel-2) center/cover no-repeat; display: block;
+    width: 100%; object-fit: cover;
+  }
+  .thumb.ph { display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 13px; }
+  .meta { padding: 12px 13px; display: flex; flex-direction: column; gap: 8px; }
+  .pills { display: flex; flex-wrap: wrap; gap: 6px; }
+  .pill {
+    background: var(--panel-2); border: 1px solid var(--line); color: var(--text);
+    padding: 2px 9px; border-radius: 999px; font-size: 12.5px;
+  }
+  .pill.idol { border-color: #35507e; color: #cfe0ff; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px 12px; color: var(--muted); font-size: 12.5px; }
+  .row a { color: var(--accent); text-decoration: none; }
+  .row a:hover { text-decoration: underline; }
+  .score { color: #ffd479; }
+  .actions { display: flex; gap: 8px; padding: 0 13px 13px; }
+  .actions button { flex: 1; font-weight: 600; }
+  .approve { background: var(--ok); border-color: var(--ok); }
+  .approve:hover:not(:disabled) { background: var(--ok-hover); }
+  .reject { background: var(--no); border-color: var(--no); }
+  .reject:hover:not(:disabled) { background: var(--no-hover); }
+  .note { color: var(--muted); text-align: center; padding: 60px 20px; }
+
+  /* Forms */
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 22px; max-width: 560px; }
+  .panel h2 { margin: 0 0 4px; font-size: 17px; }
+  .panel .hint { color: var(--muted); font-size: 13px; margin: 0 0 18px; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .field input, .field select {
+    width: 100%; padding: 9px 11px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--panel-2); color: var(--text); font: inherit;
+  }
+  .field.inline { display: flex; align-items: center; gap: 8px; }
+  .field.inline input { width: auto; }
+  .field.inline label { margin: 0; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 7px; max-height: 160px; overflow: auto;
+    padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); }
+  .chip { border: 1px solid var(--line); background: var(--panel); color: var(--text);
+    padding: 4px 11px; border-radius: 999px; cursor: pointer; font-size: 13px; user-select: none; }
+  .chip.on { background: #294066; border-color: #3f6bb0; color: #dbe8ff; }
+  .form-actions { margin-top: 8px; }
+  .form-actions button { background: var(--accent); border-color: var(--accent); color: #0b1020;
+    font-weight: 650; }
+  .idol-list { display: flex; flex-direction: column; gap: 16px; margin-bottom: 26px; }
+  .group-block h3 { margin: 0 0 8px; font-size: 14px; color: var(--muted); font-weight: 600;
+    text-transform: uppercase; letter-spacing: .5px; }
+
+  .gate { max-width: 420px; margin: 80px auto; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 12px; padding: 26px; }
+  .gate h2 { margin: 0 0 6px; font-size: 18px; }
+  .gate p { color: var(--muted); margin: 0 0 16px; font-size: 13.5px; }
+  .gate input {
+    width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--panel-2); color: var(--text); font: inherit; margin-bottom: 12px;
+  }
+  .gate button { width: 100%; background: var(--accent); border-color: var(--accent); color: #0b1020; font-weight: 650; }
+  .toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: var(--panel-2); border: 1px solid var(--line); padding: 10px 16px; border-radius: 9px;
+    font-size: 13.5px; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 90vw;
+  }
+  .toast.show { opacity: 1; }
+  .toast.err { border-color: var(--no); color: #ffb3b0; }
+  .toast.ok { border-color: var(--ok); color: #b6f0cf; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+  <header class="hidden" id="bar">
+    <h1>Kpopics</h1>
+    <div class="tabs">
+      <button class="tab active" data-view="queue">Queue <span class="count" id="count"></span></button>
+      <button class="tab" data-view="add">Add photo</button>
+      <button class="tab" data-view="idols">Idols</button>
+    </div>
+    <span class="spacer"></span>
+    <button id="refresh">Refresh</button>
+    <button id="logout">Change token</button>
+  </header>
+
+  <div class="main">
+    <!-- Token gate -->
+    <div id="gate" class="gate">
+      <h2>Enter access token</h2>
+      <p>The API token (<code>API_TOKEN</code>) is sent as a Bearer header. Stored only in this browser.</p>
+      <input id="token" type="password" placeholder="token" autocomplete="off" />
+      <button id="save">Continue</button>
+    </div>
+
+    <!-- Queue view -->
+    <section id="view-queue" class="view hidden">
+      <div id="empty" class="note hidden">No photos waiting for approval. 🎉</div>
+      <div id="grid" class="grid"></div>
+    </section>
+
+    <!-- Add photo view -->
+    <section id="view-add" class="view hidden">
+      <div class="panel">
+        <h2>Add a photo (manual)</h2>
+        <p class="hint">Paste an image URL or upload a file, pick who's in it, and it enters the
+          approval queue as pending.</p>
+        <div class="field">
+          <label>Who's in the photo?</label>
+          <div class="chips" id="add-idols"><span class="note" style="padding:8px">loading idols…</span></div>
+        </div>
+        <div class="field">
+          <label>Image URL</label>
+          <input id="add-url" type="url" placeholder="https://…/photo.jpg" />
+        </div>
+        <div class="field">
+          <label>…or upload a file</label>
+          <input id="add-file" type="file" accept="image/*" />
+        </div>
+        <div class="two">
+          <div class="field"><label>Date (optional)</label><input id="add-date" type="text" placeholder="2025-09-30" /></div>
+          <div class="field"><label>Album id (optional)</label><input id="add-album" type="text" placeholder="e.g. event slug" /></div>
+        </div>
+        <div class="two">
+          <div class="field"><label>Copies (optional)</label><input id="add-copies" type="number" min="0" value="0" /></div>
+          <div class="field inline" style="align-self:end;padding-bottom:10px">
+            <input id="add-urgent" type="checkbox" /><label for="add-urgent">Urgent</label>
+          </div>
+        </div>
+        <div class="form-actions"><button id="add-submit">Add to queue</button></div>
+      </div>
+    </section>
+
+    <!-- Idols view -->
+    <section id="view-idols" class="view hidden">
+      <div class="idol-list" id="idol-list"></div>
+      <div class="panel">
+        <h2>Register a new idol</h2>
+        <p class="hint">The idol key is the lowercase english name (used in tweet logic). Names are
+          shown/typed in the tweet; tags are the hashtags.</p>
+        <div class="two">
+          <div class="field"><label>Key</label><input id="ni-key" type="text" placeholder="karina" /></div>
+          <div class="field"><label>Name tags</label><input id="ni-tags" type="text" placeholder="#KARINA" /></div>
+        </div>
+        <div class="field"><label>Display names (comma-separated)</label>
+          <input id="ni-names" type="text" placeholder="Karina, 카리나, カリナ" /></div>
+        <div class="field"><label>Group</label>
+          <select id="ni-group"></select></div>
+        <div id="ni-newgroup" class="hidden">
+          <div class="two">
+            <div class="field"><label>New group key</label><input id="ng-key" type="text" placeholder="aespa" /></div>
+            <div class="field"><label>New group tags</label><input id="ng-tags" type="text" placeholder="#aespa" /></div>
+          </div>
+          <div class="field"><label>New group names (comma-separated)</label>
+            <input id="ng-names" type="text" placeholder="aespa, 에스파" /></div>
+        </div>
+        <div class="field"><label>Kpopping profile URL (optional — enables auto-scraping)</label>
+          <input id="ni-kpurl" type="url" placeholder="https://kpopping.com/profiles/idol/Karina2" /></div>
+        <div class="form-actions"><button id="ni-submit">Register idol</button></div>
+      </div>
+    </section>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+<script>
+const KEY = "kpics_token";
+let token = localStorage.getItem(KEY) || "";
+const $ = (id) => document.getElementById(id);
+const blobUrls = [];
+let idolsCache = [];
+let groupsCache = [];
+const addSelected = new Set();
+
+function toast(msg, kind) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.className = "toast show" + (kind ? " " + kind : "");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => (t.className = "toast"), 2600);
+}
+
+function authHeaders() { return { Authorization: "Bearer " + token }; }
+
+function showGate(show) {
+  $("gate").classList.toggle("hidden", !show);
+  $("bar").classList.toggle("hidden", show);
+  document.querySelectorAll(".view").forEach((v) => v.classList.add("hidden"));
+  if (!show) setView("queue");
+}
+
+function logout() {
+  localStorage.removeItem(KEY); token = "";
+  blobUrls.splice(0).forEach(URL.revokeObjectURL);
+  $("grid").innerHTML = "";
+  showGate(true);
+}
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, { ...opts, headers: { ...authHeaders(), ...(opts.headers || {}) } });
+  if (res.status === 401) { logout(); toast("Invalid or missing token.", "err"); throw new Error("unauthorized"); }
+  if (!res.ok) {
+    let detail = res.statusText;
+    try { detail = (await res.json()).detail || detail; } catch (e) {}
+    throw new Error(detail);
+  }
+  return res;
+}
+
+/* ---------- View switching ---------- */
+function setView(name) {
+  document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t.dataset.view === name));
+  document.querySelectorAll(".view").forEach((v) => v.classList.toggle("hidden", v.id !== "view-" + name));
+  if (name === "queue") loadQueue();
+  if (name === "add" || name === "idols") ensureIdols();
+}
+
+/* ---------- Queue ---------- */
+async function loadImage(imgEl, id) {
+  try {
+    const res = await api(`/photos/${id}/image`);
+    const url = URL.createObjectURL(await res.blob());
+    blobUrls.push(url);
+    imgEl.style.backgroundImage = `url("${url}")`;
+    imgEl.classList.remove("ph");
+    imgEl.textContent = "";
+  } catch (e) {
+    imgEl.textContent = "image unavailable";
+  }
+}
+
+function metaRow(photo) {
+  const bits = [];
+  if (photo.source) bits.push(`<span>${photo.source}</span>`);
+  if (photo.date) bits.push(`<span>${photo.date}</span>`);
+  if (photo.album_id) bits.push(`<span title="album">📁 ${photo.album_id}</span>`);
+  if (photo.ai_score != null) bits.push(`<span class="score">★ ${photo.ai_score}</span>`);
+  if (photo.source_url) bits.push(`<a href="${photo.source_url}" target="_blank" rel="noreferrer">source ↗</a>`);
+  return bits.join("");
+}
+
+function card(photo) {
+  const el = document.createElement("div");
+  el.className = "card";
+  const idols = (photo.idols || []).map((k) => `<span class="pill idol">${k}</span>`).join("") ||
+                `<span class="pill">no idol?</span>`;
+  el.innerHTML = `
+    <div class="thumb ph">loading…</div>
+    <div class="meta">
+      <div class="pills">${idols}</div>
+      <div class="row">${metaRow(photo)}</div>
+    </div>
+    <div class="actions">
+      <button class="approve">Approve</button>
+      <button class="reject">Reject</button>
+    </div>`;
+  loadImage(el.querySelector(".thumb"), photo.id);
+  const [approveBtn, rejectBtn] = el.querySelectorAll(".actions button");
+  approveBtn.onclick = () => act(el, [approveBtn, rejectBtn], photo.id, "approve");
+  rejectBtn.onclick = () => {
+    if (confirm("Reject this photo? The image is deleted permanently.")) {
+      act(el, [approveBtn, rejectBtn], photo.id, "reject");
+    }
+  };
+  return el;
+}
+
+async function act(el, btns, id, action) {
+  btns.forEach((b) => (b.disabled = true));
+  try {
+    await api(`/photos/${id}/${action}`, { method: "PATCH" });
+    el.classList.add("leaving");
+    setTimeout(() => { el.remove(); recount(); }, 200);
+    toast(action === "approve" ? "Approved ✓" : "Rejected", "ok");
+  } catch (e) {
+    btns.forEach((b) => (b.disabled = false));
+    toast(e.message, "err");
+  }
+}
+
+function recount() {
+  const n = $("grid").children.length;
+  $("count").textContent = n ? `(${n})` : "";
+  $("empty").classList.toggle("hidden", n > 0);
+}
+
+async function loadQueue() {
+  try {
+    const { photos } = await (await api("/photos/pending")).json();
+    blobUrls.splice(0).forEach(URL.revokeObjectURL);
+    const grid = $("grid");
+    grid.innerHTML = "";
+    photos.forEach((p) => grid.appendChild(card(p)));
+    recount();
+  } catch (e) {
+    if (e.message !== "unauthorized") toast("Could not load queue: " + e.message, "err");
+  }
+}
+
+/* ---------- Idols (shared load) ---------- */
+async function ensureIdols(force) {
+  if (idolsCache.length && !force) { renderIdolViews(); return; }
+  try {
+    const data = await (await api("/idols")).json();
+    idolsCache = data.idols || [];
+    groupsCache = data.groups || [];
+    renderIdolViews();
+  } catch (e) {
+    if (e.message !== "unauthorized") toast("Could not load idols: " + e.message, "err");
+  }
+}
+
+function renderIdolViews() {
+  // Add-photo idol picker
+  const picker = $("add-idols");
+  if (!idolsCache.length) {
+    picker.innerHTML = `<span class="note" style="padding:8px">No idols yet — register one first.</span>`;
+  } else {
+    picker.innerHTML = "";
+    idolsCache.forEach((i) => {
+      const chip = document.createElement("span");
+      chip.className = "chip" + (addSelected.has(i.key) ? " on" : "");
+      chip.textContent = i.idol_names[0] || i.key;
+      chip.title = i.group_key || "";
+      chip.onclick = () => {
+        if (addSelected.has(i.key)) addSelected.delete(i.key); else addSelected.add(i.key);
+        chip.classList.toggle("on");
+      };
+      picker.appendChild(chip);
+    });
+  }
+
+  // Idols list, grouped
+  const list = $("idol-list");
+  list.innerHTML = "";
+  const byGroup = {};
+  idolsCache.forEach((i) => { (byGroup[i.group_key || "—"] ||= []).push(i); });
+  Object.keys(byGroup).sort().forEach((g) => {
+    const block = document.createElement("div");
+    block.className = "group-block";
+    const chips = byGroup[g].map((i) =>
+      `<span class="pill idol" title="${i.name_tags || ""}">${i.idol_names[0] || i.key}</span>`).join(" ");
+    block.innerHTML = `<h3>${g}</h3><div class="pills">${chips}</div>`;
+    list.appendChild(block);
+  });
+
+  // Group dropdown
+  const sel = $("ni-group");
+  sel.innerHTML = groupsCache.map((g) => `<option value="${g.key}">${g.key}</option>`).join("") +
+    `<option value="__new__">+ new group…</option>`;
+  toggleNewGroup();
+}
+
+function toggleNewGroup() {
+  $("ni-newgroup").classList.toggle("hidden", $("ni-group").value !== "__new__");
+}
+
+/* ---------- Add photo submit ---------- */
+async function submitAdd() {
+  if (!addSelected.size) return toast("Pick at least one idol.", "err");
+  const url = $("add-url").value.trim();
+  const file = $("add-file").files[0];
+  if (!url && !file) return toast("Provide an image URL or a file.", "err");
+
+  const fd = new FormData();
+  addSelected.forEach((k) => fd.append("idols", k));
+  if (file) fd.append("file", file);
+  else fd.append("image_url", url);
+  const date = $("add-date").value.trim(); if (date) fd.append("date", date);
+  const album = $("add-album").value.trim(); if (album) fd.append("album_id", album);
+  const copies = $("add-copies").value.trim(); if (copies) fd.append("copies", copies);
+  if ($("add-urgent").checked) fd.append("urgent", "1");
+
+  const btn = $("add-submit"); btn.disabled = true;
+  try {
+    await api("/photos/manual", { method: "POST", body: fd });
+    toast("Added to queue ✓", "ok");
+    addSelected.clear();
+    ["add-url", "add-date", "add-album"].forEach((id) => ($(id).value = ""));
+    $("add-file").value = ""; $("add-copies").value = "0"; $("add-urgent").checked = false;
+    renderIdolViews();
+  } catch (e) {
+    toast(e.message, "err");
+  } finally { btn.disabled = false; }
+}
+
+/* ---------- Register idol submit ---------- */
+async function submitIdol() {
+  const key = $("ni-key").value.trim().toLowerCase();
+  const names = $("ni-names").value.split(",").map((s) => s.trim()).filter(Boolean);
+  const tags = $("ni-tags").value.trim();
+  let groupKey = $("ni-group").value;
+  const body = { key, idol_names: names, name_tags: tags || null };
+
+  if (groupKey === "__new__") {
+    groupKey = $("ng-key").value.trim().toLowerCase();
+    body.group_names = $("ng-names").value.split(",").map((s) => s.trim()).filter(Boolean);
+    body.group_tags = $("ng-tags").value.trim() || null;
+  }
+  body.group_key = groupKey;
+  body.kpopping_url = $("ni-kpurl").value.trim() || null;
+
+  if (!key) return toast("Key is required.", "err");
+  if (!names.length) return toast("At least one name is required.", "err");
+  if (!groupKey) return toast("Group is required.", "err");
+
+  const btn = $("ni-submit"); btn.disabled = true;
+  try {
+    const res = await api("/idols", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const j = await res.json();
+    if (body.kpopping_url && !j.kpopping_linked) {
+      toast(`Registered ${key}, but couldn't resolve the Kpopping URL — auto-scrape off.`, "err");
+    } else {
+      toast(`Registered ${key}${j.kpopping_linked ? " (auto-scrape on)" : ""} ✓`, "ok");
+    }
+    ["ni-key", "ni-names", "ni-tags", "ng-key", "ng-names", "ng-tags", "ni-kpurl"].forEach((id) => ($(id).value = ""));
+    await ensureIdols(true);
+  } catch (e) {
+    toast(e.message, "err");
+  } finally { btn.disabled = false; }
+}
+
+/* ---------- Wire up ---------- */
+document.querySelectorAll(".tab").forEach((t) => (t.onclick = () => setView(t.dataset.view)));
+$("save").onclick = () => {
+  const v = $("token").value.trim();
+  if (!v) return;
+  token = v; localStorage.setItem(KEY, v); $("token").value = "";
+  showGate(false);
+};
+$("token").addEventListener("keydown", (e) => { if (e.key === "Enter") $("save").click(); });
+$("refresh").onclick = () => {
+  const active = document.querySelector(".tab.active").dataset.view;
+  if (active === "queue") loadQueue(); else ensureIdols(true);
+};
+$("logout").onclick = logout;
+$("add-submit").onclick = submitAdd;
+$("ni-submit").onclick = submitIdol;
+$("ni-group").addEventListener("change", toggleNewGroup);
+
+if (token) showGate(false); else showGate(true);
+</script>
+</body>
+</html>
