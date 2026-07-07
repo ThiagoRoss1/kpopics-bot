@@ -66,7 +66,34 @@ def migrate():
                 )
             print(f"Migrated {len(idols)} idol(s).")
 
+    # After seeding, resolve Kpopping identities so any idol with a `kpopping_url` in the seed is
+    # ready for the auto-scraper (idempotent — safe to re-run after adding URLs).
+    linked = link_kpopping(idols)
+    print(f"Linked {linked} idol(s) to Kpopping for auto-scraping.")
+
     print("Migration complete.")
+
+
+def link_kpopping(idols):
+    # For each seed idol carrying a `kpopping_url`, resolve its Kpopping UUID and store both, so the
+    # per-idol poller can find it. Resolution failure is non-fatal (stored without an id, skipped).
+    from scrapers.kpopping import resolve_idol_id
+    from utils.database_operations import set_idol_kpopping
+
+    linked = 0
+    for key, info in idols.items():
+        url = (info.get('kpopping_url') or "").strip()
+        if not url:
+            continue
+
+        kpopping_id = resolve_idol_id(url)
+        set_idol_kpopping(key, url, kpopping_id)
+        if kpopping_id:
+            linked += 1
+        else:
+            print(f"Warning: could not resolve Kpopping URL for idol '{key}'.")
+
+    return linked
 
 
 if __name__ == "__main__":

@@ -86,7 +86,7 @@ class KpopBot:
             self.api_v1 = None
             self.client_v2 = None
 
-    # PHASE 2 - Pull the approved queue from the DB (source of truth), then pick what to post.
+    # Pull the approved queue from the DB (source of truth), then pick what to post.
     # The bytes still come from R2 in _download_image; only the metadata source changed (DB rows
     # instead of parsing the R2 file name).
     def _get_image(self, target_file=None):
@@ -95,8 +95,7 @@ class KpopBot:
             for data in get_approved_photos():
                 if target_file and data['key'] != target_file:
                     continue
-                # future test (multiple bots): filter by idol prefix against the linked idols
-                # (the r2_key is now an opaque object key, not the old name-encoded metadata).
+                # The r2_key is now an opaque object key, not the old name-encoded metadata.
                 is_general = self.idol_prefix == "GENERAL"
                 is_match = self.idol_prefix.lower() in [idol.lower() for idol in data['idols']]
 
@@ -131,16 +130,15 @@ class KpopBot:
                 print("No new images to post found for this bot.")
                 return None
 
-            # Photos from one Kpopping album (shared album_id) go out together as a single
-            # multi-image tweet, best first (ai_score, then fewest copies), capped at 4 — album_id
-            # is the automated successor to the old manual `combo` tag. A photo with no album_id
-            # (e.g. manual ingestion) posts on its own.
-            if file_name['album_id']:
+            # A manual combo (built on the approval screen) groups 2-4 photos of the same idol(s)
+            # into one multi-image tweet, ordered by `copies`, capped at 4. `album_id` is only
+            # provenance now. A photo with no combo posts on its own.
+            if file_name['combo']:
                 post_pack = [file for file in self.idols_list
-                             if file.get('album_id') == file_name.get('album_id')]
+                             if file.get('combo') == file_name.get('combo')
+                             and file.get('idols') == file_name.get('idols')]
 
-                post_pack.sort(key=lambda x: (-(x.get('ai_score') or 0), int(x.get('copies') or 0)))
-                return post_pack[:4]
+                return sorted(post_pack, key=lambda x: int(x.get('copies') or 0))[:4]
 
             return [file_name]
 

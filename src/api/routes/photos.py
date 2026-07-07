@@ -9,6 +9,9 @@ from utils.database_operations import (
     get_photo,
     set_photo_approved,
     set_photo_rejected,
+    set_photo_urgent,
+    create_combo,
+    clear_combo,
 )
 from utils.storage import copy_object, delete_object, get_object_bytes
 
@@ -33,6 +36,11 @@ class PhotoIn(BaseModel):
     combo: str | None = None
     album_id: str | None = None
 
+class UrgentIn(BaseModel):
+    urgent: bool
+
+class ComboIn(BaseModel):
+    photo_ids: list[int]
 
 def _download(url):
     response = requests.get(url, timeout=20)
@@ -136,6 +144,33 @@ def reject_photo(photo_id: int):
 
     set_photo_rejected(photo_id)
     return {"id": photo_id, "status": "rejected"}
+
+
+# Approval metadata (webapp): urgent + auto-combo
+
+@router.patch("/{photo_id}/urgent", dependencies=[Depends(require_token)])
+def set_urgent(photo_id: int, payload: UrgentIn):
+    photo = get_photo(photo_id)
+    if not photo:
+        raise HTTPException(status_code=404, detail="Photo not found.")
+    if photo["status"] != "pending":
+        raise HTTPException(status_code=409, detail=f"Photo is not pending (status={photo['status']}).")
+
+    set_photo_urgent(photo_id, payload.urgent)
+    return {"id": photo_id, "urgent": bool(payload.urgent)}
+
+@router.post("/combo", dependencies=[Depends(require_token)])
+def make_combo(payload: ComboIn):
+    result = create_combo(payload.photo_ids)
+    if result is None:
+        raise HTTPException(status_code=400, detail="Pick 2-4 pending photos of the same idol to make a combo.")
+
+    return result
+
+@router.delete("/combo/{combo}", dependencies=[Depends(require_token)])
+def remove_combo(combo: str):
+    clear_combo(combo)
+    return {"combo": combo, "status": "cleared"}
 
 
 @router.post("/manual", dependencies=[Depends(require_token)])

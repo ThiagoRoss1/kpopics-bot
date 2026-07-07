@@ -17,7 +17,6 @@ CONTENT_TYPES = {
     "gif": "image/gif",
 }
 
-
 def ingest_photo(image_bytes, ext, idol_keys, source,
                  source_url=None, date=None, urgent=None,
                  copies=0, combo=None, album_id=None):

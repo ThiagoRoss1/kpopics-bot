@@ -1,5 +1,6 @@
 import sqlite3
 import os
+import re
 import json
 import pathlib
 from datetime import datetime
@@ -341,7 +342,8 @@ def get_pending_photos():
 
             cursor.execute(
                 """
-                    SELECT id, source, source_url, date, ai_score, album_id, created_at
+                    SELECT id, source, source_url, date, ai_score, album_id, created_at,
+                           urgent, combo, copies
                     FROM photos
                     WHERE status = 'pending'
                     ORDER BY created_at DESC, id DESC
@@ -351,7 +353,8 @@ def get_pending_photos():
 
             photos = []
             for row in rows:
-                photo_id, source, source_url, date, ai_score, album_id, created_at = row
+                (photo_id, source, source_url, date, ai_score, album_id, created_at,
+                 urgent, combo, copies) = row
 
                 cursor.execute(
                     """
@@ -372,7 +375,10 @@ def get_pending_photos():
                     "date": date,
                     "ai_score": ai_score,
                     "album_id": album_id,
-                    "created_at": created_at
+                    "created_at": created_at,
+                    "urgent": urgent if urgent else None,
+                    "combo": combo,
+                    "copies": copies or 0
                 })
 
             return photos
@@ -443,8 +449,9 @@ def set_photo_posted(photo_id):
         return False
 
 def set_photo_rejected(photo_id, reviewed_by="webapp"):
-    # Reject: the bytes are deleted by the caller; the row is kept as 'rejected' (r2_key cleared)
-    # so the same source image is not re-ingested later (dedup via source_url).
+    # Reject: the bytes are deleted by the caller; the row is kept (r2_key cleared) so the same
+    # source image is not re-ingested later (dedup via source_url). Both status and bucket_stage
+    # read 'rejected' so the state is visible in either column.
     try:
         with closing(sqlite3.connect(DB_FILE)) as connect:
             with connect:
@@ -453,7 +460,7 @@ def set_photo_rejected(photo_id, reviewed_by="webapp"):
                 cursor.execute(
                     """
                         UPDATE photos
-                        SET status = 'rejected', bucket_stage = NULL, r2_key = NULL,
+                        SET status = 'rejected', bucket_stage = 'rejected', r2_key = NULL,
                             reviewed_by = ?, reviewed_at = ?
                         WHERE id = ?
                     """, (reviewed_by, datetime.now(TIMEZONE_BRT).isoformat(), photo_id)
@@ -463,6 +470,97 @@ def set_photo_rejected(photo_id, reviewed_by="webapp"):
 
     except Exception as e:
         print(f"Error rejecting photo {photo_id}: {e}.")
+        return False
+
+# --- Approval metadata: urgent + auto-combo (webapp) ---
+
+def set_photo_urgent(photo_id, urgent):
+    # Toggle a pending photo's urgent flag (stored 1 / NULL to match the sorter's `is not None`).
+    try:
+        with closing(sqlite3.connect(DB_FILE)) as connect:
+            with connect:
+                cursor = connect.cursor()
+
+                cursor.execute(
+                    "UPDATE photos SET urgent = ? WHERE id = ? AND status = 'pending'",
+                    (1 if urgent else None, photo_id)
+                )
+
+                return cursor.rowcount > 0
+
+    except Exception as e:
+        print(f"Error setting urgent on photo {photo_id}: {e}.")
+        return False
+
+def _idol_set(cursor, photo_id):
+    # The photo's idol keys as an ordered tuple (the grouping identity for a combo).
+    cursor.execute(
+        """
+            SELECT i.key FROM photo_idols pi
+            JOIN idols i ON pi.idol_id = i.id
+            WHERE pi.photo_id = ? ORDER BY i.id
+        """, (photo_id,)
+    )
+    return tuple(row[0] for row in cursor.fetchall())
+
+def _combos_for_idol_set(cursor, idol_set):
+    # Every distinct combo label already used by photos of exactly this idol-set (any status), so a
+    # new combo number never collides with an existing one for the same idol(s).
+    rows = cursor.execute("SELECT id, combo FROM photos WHERE combo IS NOT NULL").fetchall()
+    return {combo for pid, combo in rows if _idol_set(cursor, pid) == idol_set}
+
+def create_combo(photo_ids):
+    # Group 2-4 pending photos of the same idol(s) into one multi-image tweet. Assigns a combo label
+    # (D/T/Q by size + the next per-idol-set number) and `copies` = list order. Returns
+    # {combo, label} or None on any validation failure (caller -> 400).
+    if not (2 <= len(photo_ids) <= 4):
+        return None
+
+    try:
+        with closing(sqlite3.connect(DB_FILE)) as connect:
+            with connect:
+                cursor = connect.cursor()
+
+                idol_sets = []
+                for photo_id in photo_ids:
+                    row = cursor.execute("SELECT status FROM photos WHERE id = ?", (photo_id,)).fetchone()
+                    if not row or row[0] != "pending":
+                        return None
+                    idol_sets.append(_idol_set(cursor, photo_id))
+
+                idol_set = idol_sets[0]
+                if not idol_set or any(s != idol_set for s in idol_sets):
+                    return None
+
+                type_letter = {2: "D", 3: "T", 4: "Q"}[len(photo_ids)]
+                used = _combos_for_idol_set(cursor, idol_set)
+                numbers = [int(re.search(r"\d+", c).group()) for c in used if re.search(r"\d+", c)]
+                number = (max(numbers) + 1) if numbers else 1
+                combo = f"{type_letter}{number}"
+
+                for order, photo_id in enumerate(photo_ids, start=1):
+                    cursor.execute("UPDATE photos SET combo = ?, copies = ? WHERE id = ?",
+                                   (combo, order, photo_id))
+
+                label = f"{ {'D': 'Duo', 'T': 'Trio', 'Q': 'Quad'}[type_letter] } #{number}"
+                return {"combo": combo, "label": label}
+
+    except Exception as e:
+        print(f"Error creating combo for {photo_ids}: {e}.")
+        return None
+
+def clear_combo(combo):
+    # Ungroup: drop the combo label + copies from every photo carrying it.
+    try:
+        with closing(sqlite3.connect(DB_FILE)) as connect:
+            with connect:
+                cursor = connect.cursor()
+
+                cursor.execute("UPDATE photos SET combo = NULL, copies = 0 WHERE combo = ?", (combo,))
+                return True
+
+    except Exception as e:
+        print(f"Error clearing combo {combo}: {e}.")
         return False
 
 # --- Idol registration (webapp) ---

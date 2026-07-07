@@ -1,5 +1,4 @@
 import re
-from datetime import datetime
 
 from utils.database_operations import get_idols_with_groups
 
@@ -8,6 +7,20 @@ def build_tweet_text(idols_data, date):
     # Builds the tweet text (names + hashtags) from idol/group metadata.
     # idols_data: ordered list of dicts from get_idols_with_groups
     # (key, idol_names, name_tags, group_key, group_names, group_tags).
+    #
+    # Example output — one idol (all her names) with a date:
+    #     Karina • 카리나 • カリナ 「2025-09-30」 📸
+    #     aespa • 에스파 • エスパ ✨
+    #
+    #     #KARINA #aespa
+    #
+    # Two or more idols — only each one's first (English) name, tags accumulate, group listed once:
+    #     Karina • Winter 「2025-09-30」 📸
+    #     aespa • 에스파 • エスパ ✨
+    #
+    #     #KARINA #WINTER #aespa
+    #
+    # With no date, the ` 「…」 📸` suffix becomes just ` 📸`.
     count = len(idols_data)
 
     all_idol_names = []
@@ -102,12 +115,6 @@ def process_data(file_name):
     # date = match.group(2) or ""
     # urgent_flag = match.group(3).lower() if match.group(3) else None
     # copies = match.group(4) or 0
-
-    # Data convertor
-    date_str = ""
-    if date:
-        date_obj = datetime.strptime(date, '%y%m%d')
-        date_str = date_obj.strftime('%Y-%m-%d')
 
     final_text = build_tweet_text(idols_data, date)
 

@@ -89,12 +89,31 @@ def _event_date_from_title(title):
 
     return f"20{yy}-{mm}-{dd}"
 
+def _is_album_photo(src):
+    # A full-res album photo: a legacy "-documents-" original, or a newer cdn.kpopping.com / *.r2.dev
+    # "/kpics/YYYY/MM/..." file. Icons/logos/avatars (not under /kpics/, no -documents-) are excluded.
+    parsed = urlparse(src)
+    host, path = parsed.netloc, parsed.path
+    if "legacy.kpopping.com" in host and "-documents-" in path:
+        return True
+    if ("kpopping.com" in host or host.endswith(".r2.dev")) and "/kpics/" in path:
+        return True
+
+    return False
+
 def _extract_image_urls(soup):
-    # Photo <img> srcs are wrapped by an image optimizer (/_next/image or /api/kpics-image) that
-    # carries the real original in a `url=` query param. Decode it and keep only the full-res
-    # legacy originals (the "-documents-" files), deduped in order.
+    # This album's photos. An <img> src may be wrapped by an image optimizer (/_next/image or
+    # /api/kpics-image) carrying the real file in a `url=` param — decode it. Keep legacy
+    # "-documents-" originals and newer cdn.kpopping.com / r2.dev "/kpics/..." files. Skip the
+    # "More photos of <idol>" related strip (its thumbnails are wrapped in an <a> that links to a
+    # different /kpics/ album; this album's own gallery uses <button>, not links). Dedup by file
+    # path, since the same photo can appear on two hosts (e.g. the cover on r2.dev + gallery on cdn).
     originals = []
+    seen_paths = set()
     for img in soup.find_all("img"):
+        if img.find_parent("a", href=re.compile(r"/kpics/")):
+            continue
+
         src = img.get("src") or img.get("data-src") or ""
         if not src:
             continue
@@ -105,8 +124,11 @@ def _extract_image_urls(soup):
             if wrapped:
                 src = unquote(wrapped)
 
-        if "legacy.kpopping.com" in src and "-documents-" in src and src not in originals:
-            originals.append(src)
+        if _is_album_photo(src):
+            path = urlparse(src).path
+            if path not in seen_paths:
+                seen_paths.add(path)
+                originals.append(src)
 
     return originals
 
@@ -273,9 +295,10 @@ if __name__ == "__main__":
 
     load_dotenv()
 
-    if len(sys.argv) < 2:
-        print("Usage: python -m scrapers.kpopping <album_url> [limit]")
-        sys.exit(1)
-
-    limit = int(sys.argv[2]) if len(sys.argv) > 2 else None
-    print(scrape_album(sys.argv[1], limit=limit))
+    # Default (no args): the automatic per-idol poll — same behavior as the scheduled job.
+    # Optional manual one-off: pass a single <album_url> [image_limit] to scrape just that album.
+    if len(sys.argv) >= 2:
+        limit = int(sys.argv[2]) if len(sys.argv) > 2 else None
+        print(scrape_album(sys.argv[1], limit=limit))
+    else:
+        print(poll_all_idols())
