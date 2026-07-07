@@ -3,7 +3,8 @@
         "karina": {
             "idol_names": ["Karina", "카리나", "カリナ"],
             "name_tags": "#KARINA",
-            "group": "aespa" 
+            "group": "aespa",
+            "kpopping_url": "https://kpopping.com/profiles/idol/Karina2"
         },
         "giselle": {
             "idol_names": ["Giselle", "지젤", "ジゼル"],

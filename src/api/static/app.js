@@ -67,13 +67,17 @@ function comboLabel(combo) {
   return `${kind} #${n}`;
 }
 
-async function loadImage(el, id) {
+async function loadImage(frame, id) {
+  const photo = frame.querySelector(".photo");
   try {
     const res = await api(`/photos/${id}/image`);
     const url = URL.createObjectURL(await res.blob());
     blobUrls.push(url);
-    el.style.backgroundImage = `url("${url}")`;
-  } catch (e) { el.textContent = "image unavailable"; }
+    photo.style.backgroundImage = `url("${url}")`;
+  } catch (e) {
+    const msg = frame.querySelector(".ph-msg");
+    if (msg) msg.textContent = "image unavailable";
+  }
 }
 
 function metaLine(p) {
@@ -100,8 +104,10 @@ function card(p) {
       <button class="badge combo-badge ${p.combo ? "" : "hidden"} text-[11px] font-edge px-2 py-0.5 rounded-full bg-panel/80" title="Ungroup">${comboLabel(p.combo)} ✕</button>
       <button class="sel-btn w-6 h-6 rounded-full border-2 border-white/70 bg-black/30 hover:border-select" title="Select for combo"></button>
     </div>
-    <div class="thumb aspect-[3/4] bg-panel2 bg-cover bg-center relative flex items-center justify-center text-muted text-xs">
-      <div class="scrim absolute inset-x-0 bottom-0 p-2.5">
+    <div class="thumb aspect-[3/4] bg-panel2 relative overflow-hidden">
+      <div class="photo transform-gpu absolute inset-0 bg-cover bg-center"></div>
+      <span class="ph-msg absolute inset-0 flex items-center justify-center text-muted text-xs"></span>
+      <div class="scrim absolute inset-x-0 bottom-0 p-2.5 z-[1]">
         <div class="flex flex-wrap gap-1 mb-1">${tags}</div>
         <div class="font-edge text-[11px] text-muted">${metaLine(p)}</div>
       </div>
@@ -112,7 +118,7 @@ function card(p) {
       <button class="urgent px-3 py-1.5 rounded-lg text-sm border ${p.urgent ? "border-select text-select" : "border-line text-muted"}" title="Urgent">⚡</button>
     </div>`;
 
-  loadImage(el.querySelector(".thumb"), p.id);
+  loadImage(el, p.id);
   const [approveBtn, rejectBtn] = el.querySelectorAll(".approve, .reject");
   approveBtn.onclick = () => act(el, p.id, "approve");
   rejectBtn.onclick = () => { if (confirm("Reject this photo? The image is deleted permanently.")) act(el, p.id, "reject"); };
@@ -194,7 +200,7 @@ function refreshTray() {
   const thumbs = $("tray-thumbs");
   thumbs.innerHTML = "";
   selectOrder.forEach((id, i) => {
-    const src = cardEl(id)?.querySelector(".thumb")?.style.backgroundImage || "";
+    const src = cardEl(id)?.querySelector(".photo")?.style.backgroundImage || "";
     const t = document.createElement("div");
     t.className = "relative w-11 h-14 rounded bg-panel2 bg-cover bg-center shrink-0";
     t.style.backgroundImage = src;

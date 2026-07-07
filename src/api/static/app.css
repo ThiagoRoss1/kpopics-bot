@@ -1,24 +1,6 @@
-@import "tailwindcss";
-/* Kpopics approval webapp — Tailwind entry (theme tokens) + custom "light table" styles.
-   Loaded from index.html via <link rel="stylesheet" type="text/tailwindcss"> so the Tailwind
-   browser build compiles this file (utilities + the @theme tokens below). */
-
-@theme {
-  --color-surface: #14151A;   
-  --color-panel:   #1C1E26;   
-  --color-panel2:  #232634;
-  --color-line:    #2E313D;  
-  --color-ink:     #ECEEF3;
-  --color-muted:   #8A90A0;
-  --color-select:  #FFC24B; 
-  --color-keep:    #3FB27F;
-  --color-kill:    #E5484D;
-
-  --font-display:  "Space Grotesk", system-ui, sans-serif;
-  --font-edge:     "IBM Plex Mono", ui-monospace, monospace;
-}
-
-/* --- custom "light table" styles (plain CSS, passed through by Tailwind) --- */
+/* Kpopics approval webapp — custom "light table" styles + interactions.
+   The Tailwind @theme tokens live inline in index.html (the browser build only compiles an inline
+   <style type="text/tailwindcss">); these rules reference those tokens via var(--color-*). */
 
 body {
   background: var(--color-surface);
@@ -27,34 +9,48 @@ body {
   overflow-x: hidden;
 }
 
-/* Contact-sheet card */
+/* Contact-sheet card — no scale/lift; just a soft shadow on hover */
 .frame {
   background: var(--color-panel);
   border: 1px solid var(--color-line);
-  transition: opacity .2s ease, transform .2s ease, box-shadow .15s ease;
+  transition: box-shadow .18s ease, border-color .18s ease, opacity .2s ease;
 }
-.frame:hover { box-shadow: 0 0 0 1px var(--color-line), 0 8px 30px rgba(0, 0, 0, .35); }
-.frame.leaving { opacity: 0; transform: scale(.96); }
+.frame:hover { box-shadow: 0 10px 30px rgba(0, 0, 0, .45); }
+.frame.leaving { opacity: 0; transform: scale(.95); }
 
-/* The signature: a grease-pencil select ring + sequence number */
+/* Only the photo zooms a touch on hover; it sits on its own layer so the text overlay stays crisp.
+   The zoom is clipped by the card's overflow-hidden. */
+.frame .photo { transition: transform .4s ease, filter .3s ease; }
+.frame:hover .photo { transform: scale(1.04); filter: brightness(1.08) saturate(1.05); }
+
+/* signature: grease-pencil select ring + sequence number */
 .frame.selected { box-shadow: 0 0 0 3px var(--color-select); }
+.frame.selected:hover { box-shadow: 0 0 0 3px var(--color-select), 0 10px 30px rgba(0, 0, 0, .45); }
 .select-num {
   position: absolute; top: 8px; left: 8px; z-index: 3;
   width: 26px; height: 26px; border-radius: 999px;
   display: none; align-items: center; justify-content: center;
   background: var(--color-select); color: #241a00; font-weight: 800; font-size: 13px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, .4);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, .5);
 }
 .frame.selected .select-num { display: flex; }
 
 .combo-badge { border: 1px solid var(--color-select); color: var(--color-select); }
 
-.scrim { background: linear-gradient(to top, rgba(10, 11, 15, .92) 0%, rgba(10, 11, 15, .55) 55%, transparent 100%); }
+.scrim { background: linear-gradient(to top, rgba(10, 11, 15, .94) 0%, rgba(10, 11, 15, .55) 55%, transparent 100%); }
 
 /* selects tray slide-up */
 .tray { transition: transform .22s ease, opacity .22s ease; }
-.tray.hidden-tray { transform: translateY(120%); opacity: 0; pointer-events: none; }
+.tray.hidden-tray { transform: translate3d(0, 120%, 0); opacity: 0; pointer-events: none; }
+
+/* --- interactions: cursor + brightness only (no scale) --- */
+button:not(:disabled), .chip, .sel-btn, .combo-badge { cursor: pointer; }
+button:not(:disabled) { transition: filter .15s ease, border-color .15s ease, background-color .15s ease; }
+button:not(:disabled):hover { filter: brightness(1.08); }
+.tab { transition: color .15s ease, background-color .15s ease; }
+.sel-btn { transition: background-color .15s ease, border-color .15s ease; }
 
 @media (prefers-reduced-motion: reduce) {
-  .frame, .tray { transition: none !important; }
+  .frame .photo, .tray { transition: none !important; }
+  .frame:hover .photo { transform: none !important; }
 }

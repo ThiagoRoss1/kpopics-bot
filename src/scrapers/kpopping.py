@@ -295,10 +295,16 @@ if __name__ == "__main__":
 
     load_dotenv()
 
-    # Default (no args): the automatic per-idol poll — same behavior as the scheduled job.
-    # Optional manual one-off: pass a single <album_url> [image_limit] to scrape just that album.
-    if len(sys.argv) >= 2:
-        limit = int(sys.argv[2]) if len(sys.argv) > 2 else None
-        print(scrape_album(sys.argv[1], limit=limit))
-    else:
+    # No args               -> the automatic per-idol poll (same as the scheduled job, 5 albums/idol).
+    # `poll [albums] [imgs]` -> a capped poll, handy for a quick test (e.g. `poll 1 3`).
+    # `<album_url> [imgs]`   -> scrape a single album manually.
+    args = sys.argv[1:]
+    if not args:
         print(poll_all_idols())
+    elif args[0] == "poll":
+        albums = int(args[1]) if len(args) > 1 else 5
+        images = int(args[2]) if len(args) > 2 else None
+        print(poll_all_idols(limit_albums=albums, limit_images=images))
+    else:
+        limit = int(args[1]) if len(args) > 1 else None
+        print(scrape_album(args[0], limit=limit))
