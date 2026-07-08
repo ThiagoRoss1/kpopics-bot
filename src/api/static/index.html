@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kpopics — Approval</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<style type="text/tailwindcss">
+  
+  @theme {
+    --color-surface: #14151A;
+    --color-panel: #1C1E26;
+    --color-panel2: #232634;
+    --color-line: #2E313D;
+    --color-ink: #ECEEF3;
+    --color-muted: #8A90A0;
+    --color-select: #FFC24B;
+    --color-keep: #3FB27F;
+    --color-kill: #E5484D;
+    --font-display: "Space Grotesk", system-ui, sans-serif;
+    --font-edge: "IBM Plex Mono", ui-monospace, monospace;
+  }
+</style>
+<link rel="stylesheet" href="/static/app.css" />
+</head>
+<body class="min-h-screen">
+
+  <!-- Top bar -->
+  <header id="bar" class="hidden sticky top-0 z-20 flex flex-wrap items-center gap-3 px-5 py-3 border-b border-line bg-surface/85 backdrop-blur">
+    <span class="font-display font-bold tracking-tight text-lg">KPOPICS</span>
+    <nav class="flex gap-1 ml-2" id="tabs">
+      <button data-view="queue" class="tab font-display text-sm px-3 py-1.5 rounded-lg text-muted">Queue <span id="count" class="font-edge text-xs"></span></button>
+      <button data-view="add" class="tab font-display text-sm px-3 py-1.5 rounded-lg text-muted">Add photo</button>
+      <button data-view="idols" class="tab font-display text-sm px-3 py-1.5 rounded-lg text-muted">Idols</button>
+    </nav>
+    <span class="flex-1"></span>
+    <button id="rail-toggle" class="hidden text-sm px-3 py-1.5 rounded-lg border border-line bg-panel2 text-muted hover:border-muted/60" title="Show / hide the order & filter controls">Controls</button>
+    <button id="refresh" class="text-sm px-3 py-1.5 rounded-lg border border-line bg-panel2 hover:border-muted/60">Refresh</button>
+    <button id="logout" class="text-sm px-3 py-1.5 rounded-lg border border-line bg-panel2 hover:border-muted/60">Change token</button>
+
+    <!-- Queue control rail (second row; queue view only) -->
+    <div id="qrail" class="hidden basis-full -mx-5 px-5 pt-3 border-t border-line">
+      <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <div class="flex rounded-lg border border-line overflow-hidden shrink-0">
+          <button id="mode-order" class="qmode font-edge text-[11px] uppercase tracking-wider px-3 py-1.5">Order</button>
+          <button id="mode-filter" class="qmode font-edge text-[11px] uppercase tracking-wider px-3 py-1.5 border-l border-line">Filter</button>
+        </div>
+        <div id="qidols" class="flex items-center gap-1.5 flex-1 min-w-0 overflow-x-auto py-0.5"></div>
+        <select id="qgroup" class="qfacet hidden font-edge text-xs px-2.5 py-1.5 rounded-lg border border-line bg-panel2 text-ink outline-none focus:border-select shrink-0"></select>
+        <select id="qalbum" class="qfacet hidden font-edge text-xs px-2.5 py-1.5 rounded-lg border border-line bg-panel2 text-ink outline-none focus:border-select shrink-0 max-w-[150px]"></select>
+        <button id="qurgent" class="qfacet hidden font-edge text-xs px-3 py-1.5 rounded-lg border border-line text-muted shrink-0">⚡ Urgent</button>
+        <span class="hidden sm:block w-px h-5 bg-line shrink-0"></span>
+        <button id="qscore" class="font-edge text-xs px-3 py-1.5 rounded-lg border border-line text-muted shrink-0" title="Sort by aesthetic score, high to low">Sort ★</button>
+        <button id="qreset" class="font-edge text-xs px-3 py-1.5 rounded-lg text-muted hover:text-ink shrink-0">Reset</button>
+      </div>
+      <div id="qhint" class="font-edge text-[11px] text-muted mt-1.5"></div>
+    </div>
+  </header>
+
+  <main class="max-w-[1300px] mx-auto px-5 pb-32 pt-6">
+
+    <!-- Token gate -->
+    <section id="gate" class="max-w-md mx-auto mt-20 rounded-2xl border border-line bg-panel p-7">
+      <h1 class="font-display text-xl font-bold mb-1">Enter access token</h1>
+      <p class="text-muted text-sm mb-5">The API token (<span class="font-edge">API_TOKEN</span>) is sent as a Bearer header. Stored only in this browser.</p>
+      <input id="token" type="password" placeholder="token" autocomplete="off"
+             class="w-full px-3 py-2.5 rounded-lg border border-line bg-panel2 text-ink outline-none focus:border-select mb-3" />
+      <button id="save" class="w-full py-2.5 rounded-lg bg-select text-[#241a00] font-display font-bold">Continue</button>
+    </section>
+
+    <!-- Queue -->
+    <section id="view-queue" class="view hidden">
+      <div id="empty" class="hidden text-center text-muted py-24">No photos waiting for approval.</div>
+      <div id="grid" class="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(240px,1fr))]"></div>
+    </section>
+
+    <!-- Add photo -->
+    <section id="view-add" class="view hidden">
+      <div class="max-w-xl rounded-2xl border border-line bg-panel p-6">
+        <h2 class="font-display text-lg font-semibold mb-1">Add a photo</h2>
+        <p class="text-muted text-sm mb-5">Paste an image URL or upload a file, pick who's in it — it enters the queue as pending.</p>
+        <label class="block text-xs text-muted mb-1.5">Who's in the photo?</label>
+        <div id="add-idols" class="flex flex-wrap gap-2 max-h-40 overflow-auto p-2.5 rounded-lg border border-line bg-panel2 mb-3.5"></div>
+        <label class="block text-xs text-muted mb-1.5">Image URL</label>
+        <input id="add-url" type="url" placeholder="https://…/photo.jpg" class="w-full px-3 py-2 rounded-lg border border-line bg-panel2 outline-none focus:border-select mb-3.5" />
+        <label class="block text-xs text-muted mb-1.5">…or upload a file</label>
+        <input id="add-file" type="file" accept="image/*" class="w-full text-sm text-muted mb-3.5 file:mr-3 file:px-3 file:py-1.5 file:rounded-md file:border-0 file:bg-panel2 file:text-ink" />
+        <div class="grid grid-cols-2 gap-3.5">
+          <div><label class="block text-xs text-muted mb-1.5">Date (optional)</label><input id="add-date" type="text" placeholder="2025-09-30" class="w-full px-3 py-2 rounded-lg border border-line bg-panel2 outline-none focus:border-select" /></div>
+          <div><label class="block text-xs text-muted mb-1.5">Album id (optional)</label><input id="add-album" type="text" placeholder="event slug" class="w-full px-3 py-2 rounded-lg border border-line bg-panel2 outline-none focus:border-select" /></div>
+        </div>
+        <label class="flex items-center gap-2 mt-3.5 mb-5 text-sm"><input id="add-urgent" type="checkbox" class="accent-select" /> Urgent</label>
+        <button id="add-submit" class="w-full py-2.5 rounded-lg bg-select text-[#241a00] font-display font-bold">Add to queue</button>
+      </div>
+    </section>
+
+    <!-- Idols -->
+    <section id="view-idols" class="view hidden">
+      <div id="idol-list" class="flex flex-col gap-4 mb-7"></div>
+      <div class="max-w-xl rounded-2xl border border-line bg-panel p-6">
+        <h2 class="font-display text-lg font-semibold mb-1">Register a new idol</h2>
+        <p class="text-muted text-sm mb-5">Key is the lowercase english name. Add the Kpopping profile URL to enable auto-scraping.</p>
+        <div class="grid grid-cols-2 gap-3.5">
+          <div><label class="block text-xs text-muted mb-1.5">Key</label><input id="ni-key" type="text" placeholder="karina" class="w-full px-3 py-2 rounded-lg border border-line bg-panel2 outline-none focus:border-select" /></div>
+          <div><label class="block text-xs text-muted mb-1.5">Name tags</label><input id="ni-tags" type="text" placeholder="#KARINA" class="w-full px-3 py-2 rounded-lg border border-line bg-panel2 outline-none focus:border-select" /></div>
+        </div>
+        <label class="block text-xs text-muted mb-1.5 mt-3.5">Display names (comma-separated)</label>
+        <input id="ni-names" type="text" placeholder="Karina, 카리나, カリナ" class="w-full px-3 py-2 rounded-lg border border-line bg-panel2 outline-none focus:border-select" />
+        <label class="block text-xs text-muted mb-1.5 mt-3.5">Group</label>
+        <select id="ni-group" class="w-full px-3 py-2 rounded-lg border border-line bg-panel2 outline-none focus:border-select"></select>
+        <div id="ni-newgroup" class="hidden">
+          <div class="grid grid-cols-2 gap-3.5 mt-3.5">
+            <div><label class="block text-xs text-muted mb-1.5">New group key</label><input id="ng-key" type="text" placeholder="aespa" class="w-full px-3 py-2 rounded-lg border border-line bg-panel2 outline-none focus:border-select" /></div>
+            <div><label class="block text-xs text-muted mb-1.5">New group tags</label><input id="ng-tags" type="text" placeholder="#aespa" class="w-full px-3 py-2 rounded-lg border border-line bg-panel2 outline-none focus:border-select" /></div>
+          </div>
+          <label class="block text-xs text-muted mb-1.5 mt-3.5">New group names (comma-separated)</label>
+          <input id="ng-names" type="text" placeholder="aespa, 에스파" class="w-full px-3 py-2 rounded-lg border border-line bg-panel2 outline-none focus:border-select" />
+        </div>
+        <label class="block text-xs text-muted mb-1.5 mt-3.5">Kpopping profile URL (optional — enables auto-scraping)</label>
+        <input id="ni-kpurl" type="url" placeholder="https://kpopping.com/profiles/idol/Karina2" class="w-full px-3 py-2 rounded-lg border border-line bg-panel2 outline-none focus:border-select mb-5" />
+        <button id="ni-submit" class="w-full py-2.5 rounded-lg bg-select text-[#241a00] font-display font-bold">Register idol</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- Selects tray (combo builder) -->
+  <div id="tray" class="tray hidden-tray fixed bottom-0 inset-x-0 z-30 border-t border-line bg-panel/95 backdrop-blur px-5 py-3">
+    <div class="max-w-[1300px] mx-auto flex items-center gap-4">
+      <span class="font-display text-xs uppercase tracking-widest text-select">Selects</span>
+      <div id="tray-thumbs" class="flex gap-2 overflow-x-auto flex-1"></div>
+      <span id="tray-label" class="font-edge text-sm text-muted whitespace-nowrap"></span>
+      <button id="make-combo" class="px-4 py-2 rounded-lg bg-select text-[#241a00] font-display font-bold whitespace-nowrap">Make combo</button>
+      <button id="clear-sel" class="px-3 py-2 rounded-lg border border-line text-muted hover:text-ink">Clear</button>
+    </div>
+  </div>
+
+  <div id="toast" class="fixed bottom-24 left-1/2 -translate-x-1/2 z-40 px-4 py-2.5 rounded-lg border border-line bg-panel2 text-sm opacity-0 pointer-events-none transition-opacity"></div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
