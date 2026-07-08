@@ -4,12 +4,11 @@ from urllib.parse import urlparse, parse_qs, unquote
 import requests
 from bs4 import BeautifulSoup
 
-from utils.database_operations import (
-    get_idol_keys_by_names,
-    photo_exists_by_source_url,
-    get_idols_for_discovery,
-)
-from utils.ingest import ingest_photo
+# DB/ingest imports are deliberately NOT at module top: they're pulled in lazily inside the
+# functions that use them (scrape_album, poll_all_idols). This keeps `import scrapers.kpopping`
+# free of database_operations (which raises if DB_FILE is unset), so the local ingestion script
+# can import this module's pure parsing functions on a machine with no DB. Same lazy-import
+# pattern database_operations._build_photo_text already uses.
 
 # Kpopping serves 403 to the default library user-agent but 200 to a normal browser one.
 HEADERS = {
@@ -157,6 +156,9 @@ def scrape_album(url, limit=None):
     # Ingest full-res photos of one Kpopping album into the pipeline (status='pending'), tagged
     # with the album's known member(s). Group-only or unknown-idol albums are rejected.
     # `limit` caps how many images are ingested (handy for a quick test); None = the whole album.
+    from utils.database_operations import get_idol_keys_by_names, photo_exists_by_source_url
+    from utils.ingest import ingest_photo
+
     summary = {"album_id": _album_id_from_url(url), "ingested": 0, "skipped": 0, "rejected_reason": None}
 
     html = fetch_album(url)
@@ -276,6 +278,8 @@ def scrape_idol(kpopping_id, limit_albums=5, limit_images=None):
 
 def poll_all_idols(limit_albums=5, limit_images=None):
     # The scheduled job: scrape the recent albums of every idol that has a Kpopping id registered.
+    from utils.database_operations import get_idols_for_discovery
+
     total = {"idols": 0, "albums": 0, "ingested": 0, "skipped": 0}
 
     for idol in get_idols_for_discovery():

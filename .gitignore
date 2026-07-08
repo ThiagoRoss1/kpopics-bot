@@ -5,6 +5,9 @@ __pycache__/
 # env file
 .env
 
+# local ingestion script's own env
+src/scripts/local_ingest.env
+
 # test file
 test_variations.py
 
