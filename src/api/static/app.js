@@ -136,11 +136,19 @@ function card(p) {
   loadImage(el, p.id);
   const [approveBtn, rejectBtn] = el.querySelectorAll(".approve, .reject");
   approveBtn.onclick = () => act(el, p.id, "approve");
-  rejectBtn.onclick = () => { if (confirm("Reject this photo? The image is deleted permanently.")) act(el, p.id, "reject"); };
+  rejectBtn.onclick = () => act(el, p.id, "reject");
   el.querySelector(".urgent").onclick = (e) => toggleUrgent(p.id, e.currentTarget);
   el.querySelector(".sel-btn").onclick = () => toggleSelect(p.id);
+  el.querySelector(".thumb").onclick = (e) => { if (e.target.closest("a")) return; toggleSelect(p.id); };
   el.querySelector(".badge").onclick = () => ungroup(p.combo);
   return el;
+}
+
+// Remove one card from the grid + queue data (shared by single act() and batchAct()).
+function dropCard(id) {
+  const el = cardsById.get(id);
+  if (el) { el.classList.add("leaving"); setTimeout(() => { el.remove(); cardsById.delete(id); }, 200); }
+  queueData = queueData.filter((p) => p.id !== id);
 }
 
 async function act(el, id, action) {
@@ -148,18 +156,34 @@ async function act(el, id, action) {
   try {
     await api(`/photos/${id}/${action}`, { method: "PATCH" });
     deselect(id);
-    el.classList.add("leaving");
-    setTimeout(() => {
-      el.remove();
-      cardsById.delete(id);
-      queueData = queueData.filter((p) => p.id !== id);
-      refreshFacets(); renderRailIdols(); applyQueueView();
-    }, 200);
+    dropCard(id);
+    setTimeout(() => { refreshFacets(); renderRailIdols(); applyQueueView(); }, 200);
     toast(action === "approve" ? "Approved" : "Rejected", "ok");
   } catch (e) {
     el.querySelectorAll("button").forEach((b) => (b.disabled = false));
     toast(e.message, "err");
   }
+}
+
+// Approve or reject every currently-selected photo. Batch reject (>1) confirms once;
+// single actions are instant. Combo selection/state is untouched.
+async function batchAct(action) {
+  const ids = selectOrder.slice();
+  if (!ids.length) return;
+  if (action === "reject" && ids.length > 1 &&
+      !confirm(`Reject ${ids.length} photos? The images are deleted permanently.`)) return;
+  [$("batch-approve"), $("batch-reject"), $("make-combo"), $("clear-sel")].forEach((b) => (b.disabled = true));
+  let ok = 0;
+  for (const id of ids) {
+    try {
+      await api(`/photos/${id}/${action}`, { method: "PATCH" });
+      dropCard(id);
+      ok++;
+    } catch (e) { toast(e.message, "err"); }
+  }
+  clearSelection();
+  setTimeout(() => { refreshFacets(); renderRailIdols(); applyQueueView(); }, 200);
+  toast(`${action === "approve" ? "Approved" : "Rejected"} ${ok}`, "ok");
 }
 
 async function toggleUrgent(id, btn) {
@@ -362,6 +386,11 @@ function refreshTray() {
     thumbs.appendChild(t);
   });
 
+  const n = selectOrder.length;
+  const ba = $("batch-approve"), br = $("batch-reject");
+  ba.textContent = `Approve ${n}`; br.textContent = `Reject ${n}`;
+  ba.disabled = br.disabled = false;
+
   const idols = new Set(selectOrder.map((id) => cardEl(id)?.dataset.idols));
   const sizeName = { 2: "Duo", 3: "Trio", 4: "Quad" }[selectOrder.length];
   const sameIdol = idols.size === 1;
@@ -501,6 +530,8 @@ $("ni-submit").onclick = submitIdol;
 $("ni-group").addEventListener("change", toggleNewGroup);
 $("make-combo").onclick = makeCombo;
 $("clear-sel").onclick = clearSelection;
+$("batch-approve").onclick = () => batchAct("approve");
+$("batch-reject").onclick = () => batchAct("reject");
 
 /* queue rail */
 $("mode-order").onclick = () => setMode("order");
