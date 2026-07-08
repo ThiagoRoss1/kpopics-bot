@@ -33,8 +33,11 @@ def migrate():
             for key, info in groups.items():
                 cursor.execute(
                     """
-                        INSERT OR IGNORE INTO groups (key, group_names, group_tags)
+                        INSERT INTO groups (key, group_names, group_tags)
                         VALUES (?, ?, ?)
+                        ON CONFLICT(key) DO UPDATE SET
+                            group_names = excluded.group_names,
+                            group_tags = excluded.group_tags
                     """, (
                         key,
                         json.dumps(info.get('group_names', []), ensure_ascii=False),
@@ -55,8 +58,12 @@ def migrate():
 
                 cursor.execute(
                     """
-                        INSERT OR IGNORE INTO idols (key, idol_names, name_tags, group_id)
+                        INSERT INTO idols (key, idol_names, name_tags, group_id)
                         VALUES (?, ?, ?, ?)
+                        ON CONFLICT(key) DO UPDATE SET
+                            idol_names = excluded.idol_names,
+                            name_tags = excluded.name_tags,
+                            group_id = excluded.group_id
                     """, (
                         key,
                         json.dumps(info.get('idol_names', []), ensure_ascii=False),

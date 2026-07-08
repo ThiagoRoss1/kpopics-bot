@@ -9,42 +9,50 @@
         "giselle": {
             "idol_names": ["Giselle", "지젤", "ジゼル"],
             "name_tags": "#GISELLE",
-            "group": "aespa"
+            "group": "aespa",
+            "kpopping_url": "https://kpopping.com/profiles/idol/giselle"
         },
         "ningning": {
             "idol_names": ["Ningning", "닝닝", "ニンニン"],
             "name_tags": "#NINGNING",
-            "group": "aespa"
+            "group": "aespa",
+            "kpopping_url": "https://kpopping.com/profiles/idol/ningning"
         },
         "winter": {
             "idol_names": ["Winter", "윈터", "ウィンター"],
             "name_tags": "#WINTER",
-            "group": "aespa"
+            "group": "aespa",
+            "kpopping_url": "https://kpopping.com/profiles/idol/winter"
         },
         "chaewon": {
-            "idol_names": ["Chaewon", "채원", "チェウォン"],
+            "idol_names": ["Kim Chaewon", "채원", "チェウォン"],
             "name_tags": "#KIMCHAEWON",
-            "group": "le sserafim"
+            "group": "le sserafim",
+            "kpopping_url": "https://kpopping.com/profiles/idol/Kim-Chaewon"
         },
         "yunjin": {
-            "idol_names": ["Yunjin", "허윤진", "ホユンジン"],
+            "idol_names": ["Huh Yunjin", "허윤진", "ホユンジン"],
             "name_tags": "#HUHYUNJIN",
-            "group": "le sserafim"
+            "group": "le sserafim",
+            "kpopping_url": "https://kpopping.com/profiles/idol/Huh-Yunjin"
         },
         "kazuha": {
             "idol_names": ["Kazuha", "카즈하", "カズハ"],
             "name_tags": "#KAZUHA",
-            "group": "le sserafim"
+            "group": "le sserafim",
+            "kpopping_url": "https://kpopping.com/profiles/idol/Kazuha"
         },
         "sakura": {
             "idol_names": ["Sakura", "사쿠라", "宮脇咲良", "サクラ"],
             "name_tags": "#SAKURA",
-            "group": "le sserafim"
+            "group": "le sserafim",
+            "kpopping_url": "https://kpopping.com/profiles/idol/Sakura"
         },
         "eunchae": {
-            "idol_names": ["Eunchae", "홍은채", "ホンウンチェ"],
+            "idol_names": ["Hong Eunchae", "홍은채", "ホンウンチェ"],
             "name_tags": "#HONGEUNCHAE",
-            "group": "le sserafim"
+            "group": "le sserafim",
+            "kpopping_url": "https://kpopping.com/profiles/idol/Hong-Eunchae"
         }
     },
 

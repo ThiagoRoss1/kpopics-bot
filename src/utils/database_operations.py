@@ -563,6 +563,48 @@ def clear_combo(combo):
         print(f"Error clearing combo {combo}: {e}.")
         return False
 
+# --- AI aesthetic score (local worker) ---
+
+def get_photos_pending_score():
+    # The local AI worker's queue: pending photos that don't have an aesthetic score yet
+    # (oldest first, so a backlog is worked through in order).
+    try:
+        with closing(sqlite3.connect(DB_FILE)) as connect:
+            cursor = connect.cursor()
+
+            cursor.execute(
+                """
+                    SELECT id, source, date FROM photos
+                    WHERE status = 'pending' AND ai_score IS NULL
+                    ORDER BY created_at ASC, id ASC
+                """
+            )
+
+            return [{"id": row[0], "source": row[1], "date": row[2]} for row in cursor.fetchall()]
+
+    except Exception as e:
+        print(f"Error retrieving photos pending score: {e}.")
+        return []
+
+def set_photo_score(photo_id, ai_score, ai_reasoning=None):
+    # Store the worker's aesthetic score (1-10) + optional reasoning. Advisory only — the sorter
+    # uses it as a tiebreaker and it shows on the approval card; nothing auto-filters on it.
+    try:
+        with closing(sqlite3.connect(DB_FILE)) as connect:
+            with connect:
+                cursor = connect.cursor()
+
+                cursor.execute(
+                    "UPDATE photos SET ai_score = ?, ai_reasoning = ? WHERE id = ?",
+                    (ai_score, ai_reasoning, photo_id)
+                )
+
+                return cursor.rowcount > 0
+
+    except Exception as e:
+        print(f"Error setting score on photo {photo_id}: {e}.")
+        return False
+
 # --- Idol registration (webapp) ---
 
 def get_all_idols():

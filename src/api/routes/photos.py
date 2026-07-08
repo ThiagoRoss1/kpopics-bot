@@ -12,6 +12,8 @@ from utils.database_operations import (
     set_photo_urgent,
     create_combo,
     clear_combo,
+    get_photos_pending_score,
+    set_photo_score,
 )
 from utils.storage import copy_object, delete_object, get_object_bytes
 
@@ -41,6 +43,10 @@ class UrgentIn(BaseModel):
 
 class ComboIn(BaseModel):
     photo_ids: list[int]
+
+class ScoreIn(BaseModel):
+    ai_score: float
+    ai_reasoning: str | None = None
 
 def _download(url):
     response = requests.get(url, timeout=20)
@@ -171,6 +177,22 @@ def make_combo(payload: ComboIn):
 def remove_combo(combo: str):
     clear_combo(combo)
     return {"combo": combo, "status": "cleared"}
+
+
+# AI aesthetic score (local worker)
+
+@router.get("/pending-score", dependencies=[Depends(require_token)])
+def list_pending_score():
+    # The local AI worker's queue: pending photos without an aesthetic score yet.
+    return {"photos": get_photos_pending_score()}
+
+@router.patch("/{photo_id}/score", dependencies=[Depends(require_token)])
+def score_photo(photo_id: int, payload: ScoreIn):
+    # The worker posts back the computed aesthetic score (advisory; nothing auto-filters on it).
+    if not set_photo_score(photo_id, payload.ai_score, payload.ai_reasoning):
+        raise HTTPException(status_code=404, detail="Photo not found.")
+
+    return {"id": photo_id, "ai_score": payload.ai_score}
 
 
 @router.post("/manual", dependencies=[Depends(require_token)])

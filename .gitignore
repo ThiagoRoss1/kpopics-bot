@@ -10,3 +10,7 @@ test_variations.py
 
 # database file
 *.db
+
+weights/
+
+requirements-worker.txt

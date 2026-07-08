@@ -9,6 +9,19 @@ let groupsCache = [];
 const addSelected = new Set();      // add-photo idol picker
 let selectOrder = [];               // combo selection: photo ids in order
 
+/* ---------------- queue view state ---------------- */
+let queueData = [];                 // raw pending photos from the server (created_at DESC)
+const cardsById = new Map();        // photo id -> card element (built once so images load once)
+let qMode = "order";                // "order" (pin idols on top) | "filter" (show only matches)
+const orderPins = [];               // idol keys, in click order (Order mode)
+const filterIdols = new Set();      // idol keys to keep (Filter mode)
+let filterGroup = "";               // group key, or "" for all
+let filterAlbum = "";               // album_id, or "" for all
+let filterUrgent = false;           // Filter mode: urgent-only
+let sortScore = false;              // global: rerank by ai_score, high -> low
+let onQueue = false;                // is the queue tab the active view
+let railHidden = localStorage.getItem("kpics_rail_hidden") === "1";   // user collapsed the rail
+
 /* ---------------- infra ---------------- */
 function toast(msg, kind) {
   const t = $("toast");
@@ -55,6 +68,8 @@ function setView(name) {
     t.classList.toggle("text-muted", !on);
   });
   document.querySelectorAll(".view").forEach((v) => v.classList.toggle("hidden", v.id !== "view-" + name));
+  onQueue = name === "queue";
+  syncRail();
   if (name === "queue") loadQueue();
   if (name === "add" || name === "idols") ensureIdols();
 }
@@ -134,7 +149,12 @@ async function act(el, id, action) {
     await api(`/photos/${id}/${action}`, { method: "PATCH" });
     deselect(id);
     el.classList.add("leaving");
-    setTimeout(() => { el.remove(); recount(); }, 200);
+    setTimeout(() => {
+      el.remove();
+      cardsById.delete(id);
+      queueData = queueData.filter((p) => p.id !== id);
+      refreshFacets(); renderRailIdols(); applyQueueView();
+    }, 200);
     toast(action === "approve" ? "Approved" : "Rejected", "ok");
   } catch (e) {
     el.querySelectorAll("button").forEach((b) => (b.disabled = false));
@@ -151,22 +171,156 @@ async function toggleUrgent(id, btn) {
   } catch (e) { toast(e.message, "err"); }
 }
 
-function recount() {
-  const n = $("grid").children.length;
-  $("count").textContent = n ? `(${n})` : "";
-  $("empty").classList.toggle("hidden", n > 0);
-}
-
 async function loadQueue() {
   try {
+    await ensureIdols();               // idol names + group_key for the rail
     const { photos } = await (await api("/photos/pending")).json();
     blobUrls.splice(0).forEach(URL.revokeObjectURL);
     clearSelection();
+    cardsById.clear();
+    queueData = photos;
     const grid = $("grid");
     grid.innerHTML = "";
-    photos.forEach((p) => grid.appendChild(card(p)));
-    recount();
+    photos.forEach((p) => { const el = card(p); cardsById.set(p.id, el); grid.appendChild(el); });
+    refreshFacets(); renderRailIdols(); updateHint(); applyQueueView();
   } catch (e) { if (e.message !== "unauthorized") toast("Could not load queue: " + e.message, "err"); }
+}
+
+/* ---------------- queue: order / filter / sort ---------------- */
+function groupOf(key) { const i = idolsCache.find((x) => x.key === key); return i ? i.group_key : ""; }
+function scoreVal(p) { return p.ai_score == null ? -1 : p.ai_score; }
+
+function passesFilters(p) {
+  if (qMode !== "filter") return true;
+  const idols = p.idols || [];
+  if (filterIdols.size && !idols.some((k) => filterIdols.has(k))) return false;
+  if (filterGroup && !idols.some((k) => groupOf(k) === filterGroup)) return false;
+  if (filterAlbum && p.album_id !== filterAlbum) return false;
+  if (filterUrgent && !p.urgent) return false;
+  return true;
+}
+
+function groupByIdol(list) {
+  // Contiguous per-idol blocks; within a block the server's created_at DESC order is kept (newest
+  // first). Block order = pinned idols first (Order mode), then idols by first appearance.
+  const buckets = new Map(), appearance = [];
+  list.forEach((p) => {
+    const k = (p.idols && p.idols[0]) || "—";
+    if (!buckets.has(k)) { buckets.set(k, []); appearance.push(k); }
+    buckets.get(k).push(p);
+  });
+  const seen = new Set(), keys = [];
+  (qMode === "order" ? orderPins : []).forEach((k) => { if (buckets.has(k) && !seen.has(k)) { keys.push(k); seen.add(k); } });
+  appearance.forEach((k) => { if (!seen.has(k)) { keys.push(k); seen.add(k); } });
+  const out = [];
+  keys.forEach((k) => out.push(...buckets.get(k)));
+  return out;
+}
+
+function applyQueueView() {
+  const grid = $("grid");
+  let list = queueData.filter(passesFilters);
+  if (sortScore) list = list.slice().sort((a, b) => scoreVal(b) - scoreVal(a));  // grouping yields to score
+  else list = groupByIdol(list);
+
+  const visible = new Set(list.map((p) => p.id));
+  cardsById.forEach((el, id) => el.classList.toggle("qhide", !visible.has(id)));
+  list.forEach((p) => { const el = cardsById.get(p.id); if (el) grid.appendChild(el); });
+
+  const n = list.length;
+  $("count").textContent = n ? `(${n})` : "";
+  const empty = $("empty");
+  if (n === 0) { empty.textContent = queueData.length ? "No photos match these filters." : "No photos waiting for approval."; }
+  empty.classList.toggle("hidden", n > 0);
+  syncRail();
+}
+
+function syncRail() {
+  // The rail shows only on the queue tab, when there's something to curate, and when not collapsed.
+  // Its toggle button lives in the always-visible top row so a hidden rail can be brought back.
+  const show = onQueue && queueData.length > 0 && !railHidden;
+  $("qrail").classList.toggle("hidden", !show);
+  $("rail-toggle").classList.toggle("hidden", !(onQueue && queueData.length > 0));
+  toggleActive($("rail-toggle"), !railHidden);
+}
+
+function renderRailIdols() {
+  const wrap = $("qidols");
+  wrap.innerHTML = "";
+  const present = [...new Set(queueData.flatMap((p) => p.idols || []))];
+  present.forEach((key) => {
+    const idol = idolsCache.find((i) => i.key === key);
+    const label = idol ? (idol.idol_names[0] || key) : key;
+    const pos = qMode === "order" ? orderPins.indexOf(key) : -1;
+    const on = qMode === "order" ? pos >= 0 : filterIdols.has(key);
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "qchip shrink-0 font-display text-[13px] px-2.5 py-1 rounded-full border " +
+      (on ? "border-select text-ink bg-select/10" : "border-line text-muted bg-panel");
+    chip.innerHTML = (pos >= 0
+      ? `<span class="inline-flex align-middle w-4 h-4 mr-1 rounded-full bg-select text-[#241a00] text-[10px] font-bold items-center justify-center">${pos + 1}</span>`
+      : "") + label;
+    chip.onclick = () => toggleRailIdol(key);
+    wrap.appendChild(chip);
+  });
+}
+
+function toggleRailIdol(key) {
+  if (qMode === "order") {
+    const i = orderPins.indexOf(key);
+    if (i >= 0) orderPins.splice(i, 1); else orderPins.push(key);
+  } else {
+    filterIdols.has(key) ? filterIdols.delete(key) : filterIdols.add(key);
+  }
+  renderRailIdols(); applyQueueView();
+}
+
+function refreshFacets() {
+  const groupKeys = [...new Set(queueData.flatMap((p) => (p.idols || []).map(groupOf)).filter(Boolean))].sort();
+  const gsel = $("qgroup");
+  gsel.innerHTML = `<option value="">All groups</option>` + groupKeys.map((g) => `<option value="${g}">${g}</option>`).join("");
+  if (!groupKeys.includes(filterGroup)) filterGroup = "";
+  gsel.value = filterGroup;
+
+  const albums = [...new Set(queueData.map((p) => p.album_id).filter(Boolean))].sort();
+  const asel = $("qalbum");
+  asel.innerHTML = `<option value="">All albums</option>` + albums.map((a) => `<option value="${a}">${a}</option>`).join("");
+  if (!albums.includes(filterAlbum)) filterAlbum = "";
+  asel.value = filterAlbum;
+}
+
+function updateHint() {
+  $("qhint").textContent = qMode === "order"
+    ? "Order — click idols to pin them to the top in that order; everything else stays grouped below."
+    : "Filter — click idols, or pick a group / album / ⚡ to show only matching photos.";
+}
+
+function toggleActive(btn, on) {
+  btn.classList.toggle("border-select", on);
+  btn.classList.toggle("text-select", on);
+  btn.classList.toggle("text-muted", !on);
+}
+
+function setMode(m) {
+  qMode = m;
+  const order = m === "order";
+  $("mode-order").classList.toggle("bg-select", order);
+  $("mode-order").classList.toggle("text-[#241a00]", order);
+  $("mode-order").classList.toggle("text-muted", !order);
+  $("mode-filter").classList.toggle("bg-select", !order);
+  $("mode-filter").classList.toggle("text-[#241a00]", !order);
+  $("mode-filter").classList.toggle("text-muted", order);
+  document.querySelectorAll(".qfacet").forEach((e) => e.classList.toggle("hidden", order));
+  updateHint(); renderRailIdols(); applyQueueView();
+}
+
+function resetQueueControls() {
+  orderPins.length = 0;
+  filterIdols.clear();
+  filterGroup = ""; filterAlbum = ""; filterUrgent = false; sortScore = false;
+  $("qgroup").value = ""; $("qalbum").value = "";
+  toggleActive($("qurgent"), false); toggleActive($("qscore"), false);
+  renderRailIdols(); applyQueueView();
 }
 
 /* ---------------- combo selection ---------------- */
@@ -347,5 +501,20 @@ $("ni-submit").onclick = submitIdol;
 $("ni-group").addEventListener("change", toggleNewGroup);
 $("make-combo").onclick = makeCombo;
 $("clear-sel").onclick = clearSelection;
+
+/* queue rail */
+$("mode-order").onclick = () => setMode("order");
+$("mode-filter").onclick = () => setMode("filter");
+$("qgroup").onchange = (e) => { filterGroup = e.target.value; applyQueueView(); };
+$("qalbum").onchange = (e) => { filterAlbum = e.target.value; applyQueueView(); };
+$("qurgent").onclick = () => { filterUrgent = !filterUrgent; toggleActive($("qurgent"), filterUrgent); applyQueueView(); };
+$("qscore").onclick = () => { sortScore = !sortScore; toggleActive($("qscore"), sortScore); applyQueueView(); };
+$("qreset").onclick = resetQueueControls;
+$("rail-toggle").onclick = () => {
+  railHidden = !railHidden;
+  localStorage.setItem("kpics_rail_hidden", railHidden ? "1" : "0");
+  syncRail();
+};
+setMode("order");
 
 if (token) showGate(false); else showGate(true);

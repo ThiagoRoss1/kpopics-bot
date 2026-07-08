@@ -37,6 +37,10 @@ body {
 
 .combo-badge { border: 1px solid var(--color-select); color: var(--color-select); }
 
+/* queue control rail: filtered-out cards + mode toggle */
+.qhide { display: none !important; }
+.qmode, .qchip { transition: color .15s ease, background-color .15s ease, border-color .15s ease; }
+
 .scrim { background: linear-gradient(to top, rgba(10, 11, 15, .94) 0%, rgba(10, 11, 15, .55) 55%, transparent 100%); }
 
 /* selects tray slide-up */
