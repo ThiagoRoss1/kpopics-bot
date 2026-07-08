@@ -85,9 +85,9 @@ function comboLabel(combo) {
 async function loadImage(frame, id) {
   const photo = frame.querySelector(".photo");
   try {
-    const res = await api(`/photos/${id}/image`);
-    const url = URL.createObjectURL(await res.blob());
-    blobUrls.push(url);
+    // The endpoint now returns a short-lived presigned R2 URL; the bytes flow R2 -> browser
+    // directly (no Railway egress). A CSS background-image load is no-cors, so no bucket CORS.
+    const { url } = await (await api(`/photos/${id}/image`)).json();
     photo.style.backgroundImage = `url("${url}")`;
   } catch (e) {
     const msg = frame.querySelector(".ph-msg");

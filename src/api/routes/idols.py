@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from api.security import require_token
 from utils.database_operations import (
     get_all_idols, get_all_groups, idol_exists, create_idol, set_idol_kpopping,
+    get_idols_for_discovery,
 )
 from scrapers.kpopping import resolve_idol_id
 
@@ -22,6 +23,13 @@ class IdolIn(BaseModel):
 def list_idols():
     # Feeds both the manual-ingest idol picker and the register-idol form's group dropdown.
     return {"idols": get_all_idols(), "groups": get_all_groups()}
+
+
+@router.get("/discovery", dependencies=[Depends(require_token)])
+def list_discovery_idols():
+    # The local ingestion script's only way to learn which idols to poll (the DB lives on Railway).
+    # Returns [{key, kpopping_id}, ...] — unlike GET /idols, this exposes the Kpopping UUID.
+    return {"idols": get_idols_for_discovery()}
 
 
 @router.post("", dependencies=[Depends(require_token)])

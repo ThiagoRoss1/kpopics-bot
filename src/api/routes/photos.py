@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import Response
 from pydantic import BaseModel
 from api.security import require_token
-from utils.ingest import ingest_photo
+from utils.ingest import ingest_photo, register_photo
 from utils.database_operations import (
     get_pending_photos,
     get_photo,
@@ -14,8 +14,10 @@ from utils.database_operations import (
     clear_combo,
     get_photos_pending_score,
     set_photo_score,
+    photo_exists_by_source_url,
+    get_idol_keys_by_names,
 )
-from utils.storage import copy_object, delete_object, get_object_bytes
+from utils.storage import copy_object, delete_object, get_object_bytes, presign_get_url
 
 router = APIRouter(prefix="/photos", tags=["photos"])
 
@@ -30,6 +32,18 @@ IMAGE_MEDIA_TYPES = {
 class PhotoIn(BaseModel):
     image_url: str
     idols: list[str]
+    source: str = "kpopping"
+    source_url: str | None = None
+    date: str | None = None       # ISO YYYY-MM-DD
+    urgent: int | None = None
+    copies: int = 0
+    combo: str | None = None
+    album_id: str | None = None
+
+class PhotoRegisterIn(BaseModel):
+    # Metadata-only ingest: the local script already uploaded the bytes to R2 under r2_key.
+    r2_key: str
+    idols: list[str]              # display names (resolved to keys server-side)
     source: str = "kpopping"
     source_url: str | None = None
     date: str | None = None       # ISO YYYY-MM-DD
@@ -88,6 +102,48 @@ def create_photo(payload: PhotoIn):
     return {"id": photo_id, "status": "pending"}
 
 
+# Local ingestion (bytes uploaded PC -> R2 directly; only metadata reaches Railway)
+
+@router.get("/exists", dependencies=[Depends(require_token)])
+def photo_exists(source_url: str):
+    # Cheap pre-check the local script hits before downloading/uploading, so duplicates are never
+    # re-fetched. Mirrors the scraper's photo_exists_by_source_url dedup guard.
+    return {"exists": photo_exists_by_source_url(source_url)}
+
+@router.post("/register", dependencies=[Depends(require_token)])
+def register_uploaded_photo(payload: PhotoRegisterIn):
+    # Metadata-only twin of create_photo: the bytes are already in R2 at payload.r2_key (uploaded by
+    # the local script). Logic mirrors scrape_album. Because upload precedes registration, every
+    # reject path deletes the orphaned object so R2 never accumulates orphans.
+    if not payload.r2_key.startswith("analysis/"):
+        raise HTTPException(status_code=400, detail="r2_key must be under analysis/.")
+
+    if payload.source_url and photo_exists_by_source_url(payload.source_url):
+        delete_object(payload.r2_key)
+        return {"status": "skipped", "reason": "duplicate"}
+
+    idol_keys = get_idol_keys_by_names(payload.idols)
+    if not idol_keys:
+        delete_object(payload.r2_key)
+        raise HTTPException(status_code=422, detail="Rejected: no known idols matched.")
+
+    photo_id = register_photo(
+        r2_key=payload.r2_key,
+        idol_keys=idol_keys,
+        source=payload.source,
+        source_url=payload.source_url,
+        date=payload.date,
+        urgent=payload.urgent,
+        copies=payload.copies,
+        combo=payload.combo,
+        album_id=payload.album_id,
+    )
+    if photo_id is None:
+        raise HTTPException(status_code=500, detail="Could not register photo.")
+
+    return {"id": photo_id, "status": "pending"}
+
+
 # Approval loop (webapp)
 
 @router.get("/pending", dependencies=[Depends(require_token)])
@@ -97,19 +153,19 @@ def list_pending():
 
 @router.get("/{photo_id}/image", dependencies=[Depends(require_token)])
 def get_photo_image(photo_id: int):
-    # Streams the raw bytes from R2 (private bucket) so the webapp can preview a pending photo.
-    # The page fetches this with the Bearer token and shows it via a blob URL, so no token leaks
-    # into an <img src>.
+    # Returns a short-lived presigned R2 GET URL so the webapp loads the bytes straight from R2
+    # (no re-streaming through Railway -> no egress). The metadata call still carries the Bearer
+    # token; the R2 fetch is anonymous but authorized by the signature. The URL is set as a CSS
+    # background-image (no-cors), so no bucket CORS is needed.
     photo = get_photo(photo_id)
     if not photo or not photo["r2_key"]:
         raise HTTPException(status_code=404, detail="Photo or image not found.")
 
-    data = get_object_bytes(photo["r2_key"])
-    if data is None:
-        raise HTTPException(status_code=502, detail="Could not read image from storage.")
+    url = presign_get_url(photo["r2_key"])
+    if url is None:
+        raise HTTPException(status_code=502, detail="Could not presign image URL.")
 
-    ext = photo["r2_key"].rsplit(".", 1)[-1].lower()
-    return Response(content=data, media_type=IMAGE_MEDIA_TYPES.get(ext, "application/octet-stream"))
+    return {"url": url}
 
 @router.patch("/{photo_id}/approve", dependencies=[Depends(require_token)])
 def approve_photo(photo_id: int):

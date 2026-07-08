@@ -50,3 +50,34 @@ def ingest_photo(image_bytes, ext, idol_keys, source,
     link_photo_idols(photo_id, list(id_map.values()))
     print(f"Ingested photo {photo_id} ({r2_key}) idols={list(id_map.keys())}.")
     return photo_id
+
+
+def register_photo(r2_key, idol_keys, source,
+                   source_url=None, date=None, urgent=None,
+                   copies=0, combo=None, album_id=None):
+    # Byte-free twin of ingest_photo: the bytes are ALREADY in R2 (the local script uploaded them
+    # straight there), so this only writes the DB row and links idols. Because the upload precedes
+    # registration, every reject path here must delete_object(r2_key) so R2 never accumulates
+    # orphans.
+    id_map = get_idol_ids_by_keys(idol_keys)
+    if not id_map:
+        print(f"Register rejected: no known idols in {idol_keys}.")
+        delete_object(r2_key)
+        return None
+
+    photo_id = insert_photo(
+        source=source, source_url=source_url, date=date,
+        urgent=urgent, copies=copies, combo=combo, album_id=album_id,
+    )
+    if photo_id is None:
+        delete_object(r2_key)
+        return None
+
+    if not set_photo_ready(photo_id, r2_key):
+        delete_photo(photo_id)
+        delete_object(r2_key)
+        return None
+
+    link_photo_idols(photo_id, list(id_map.values()))
+    print(f"Registered photo {photo_id} ({r2_key}) idols={list(id_map.keys())}.")
+    return photo_id

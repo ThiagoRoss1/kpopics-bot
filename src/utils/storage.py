@@ -60,3 +60,18 @@ def get_object_bytes(key):
     except Exception as e:
         print(f"Error reading {key} from R2: {e}.")
         return None
+
+def presign_get_url(key, expires_in=3600):
+    # Short-lived presigned GET URL so the browser fetches image bytes straight from R2 (never
+    # re-streamed through Railway). SigV4 with region "auto" is what R2 expects. Default 1 hour.
+    try:
+        s3 = get_s3_client()
+        return s3.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": BUCKET_NAME, "Key": key},
+            ExpiresIn=expires_in,
+        )
+
+    except Exception as e:
+        print(f"Error presigning {key} from R2: {e}.")
+        return None

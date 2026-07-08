@@ -25,15 +25,21 @@ def _int_env(name, default):
         return int(default)
 
 def build_scheduler():
-    # In-process replacement for the old Railway cron: the bot-post and scraper-poll jobs.
-    # Gated by ENABLE_SCHEDULER so running the app locally never fires real posts/scrapes by
-    # accident — in Railway set ENABLE_SCHEDULER=true. A BackgroundScheduler runs jobs in their own
-    # thread so the blocking requests/tweepy calls don't stall the FastAPI event loop.
+    # In-process replacement for the old Railway cron. Two independent gates:
+    #   ENABLE_SCHEDULER -> the bot-post job (posts approved photos). On in prod.
+    #   ENABLE_SCRAPER   -> the scraper-poll job. Off by default: server-side scraping is retired in
+    #                       favour of the local ingestion script (Railway egress reduction), but
+    #                       flipping ENABLE_SCRAPER=true re-enables it with no code change.
+    # Both default off so running the app locally never fires real posts/scrapes by accident.
+    # A BackgroundScheduler runs jobs in their own thread so the blocking requests/tweepy calls
+    # don't stall the FastAPI event loop.
     scheduler = BackgroundScheduler()
 
     if os.getenv("ENABLE_SCHEDULER", "false").lower() in ("1", "true", "yes"):
         scheduler.add_job(run_bots, "interval", hours=_int_env("POST_INTERVAL_HOURS", 6),
                           id="bot_post", replace_existing=True)
+
+    if os.getenv("ENABLE_SCRAPER", "false").lower() in ("1", "true", "yes"):
         scheduler.add_job(poll_all_idols, "interval", hours=_int_env("SCRAPE_INTERVAL_HOURS", 6),
                           id="scraper_poll", replace_existing=True)
 
