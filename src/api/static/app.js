@@ -95,6 +95,25 @@ async function loadImage(frame, id) {
   }
 }
 
+// Lazy image loading: a card fetches its presigned URL + image only when it nears the viewport,
+// so a 600-card queue doesn't fire 600 requests (and pull 600 full-res images) on open. Each card
+// loads once, then is unobserved. Bonus: URLs are minted on scroll-in, so the 1h signature is
+// always fresh. Falls back to eager load where IntersectionObserver is unavailable.
+const imgObserver = ("IntersectionObserver" in window)
+  ? new IntersectionObserver((entries, obs) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        obs.unobserve(entry.target);
+        loadImage(entry.target, +entry.target.dataset.id);
+      });
+    }, { root: null, rootMargin: "400px 0px" })
+  : null;
+
+function observeImage(el) {
+  if (imgObserver) imgObserver.observe(el);
+  else loadImage(el, +el.dataset.id);
+}
+
 function metaLine(p) {
   const bits = [];
   if (p.source) bits.push(p.source);
@@ -133,7 +152,7 @@ function card(p) {
       <button class="urgent px-3 py-1.5 rounded-lg text-sm border ${p.urgent ? "border-select text-select" : "border-line text-muted"}" title="Urgent">⚡</button>
     </div>`;
 
-  loadImage(el, p.id);
+  observeImage(el);
   const [approveBtn, rejectBtn] = el.querySelectorAll(".approve, .reject");
   approveBtn.onclick = () => act(el, p.id, "approve");
   rejectBtn.onclick = () => act(el, p.id, "reject");
@@ -147,7 +166,10 @@ function card(p) {
 // Remove one card from the grid + queue data (shared by single act() and batchAct()).
 function dropCard(id) {
   const el = cardsById.get(id);
-  if (el) { el.classList.add("leaving"); setTimeout(() => { el.remove(); cardsById.delete(id); }, 200); }
+  if (el) {
+    if (imgObserver) imgObserver.unobserve(el);
+    el.classList.add("leaving"); setTimeout(() => { el.remove(); cardsById.delete(id); }, 200);
+  }
   queueData = queueData.filter((p) => p.id !== id);
 }
 
@@ -205,6 +227,7 @@ async function loadQueue() {
     queueData = photos;
     const grid = $("grid");
     grid.innerHTML = "";
+    if (imgObserver) imgObserver.disconnect();   // drop the old cards' entries before rebuilding
     photos.forEach((p) => { const el = card(p); cardsById.set(p.id, el); grid.appendChild(el); });
     refreshFacets(); renderRailIdols(); updateHint(); applyQueueView();
   } catch (e) { if (e.message !== "unauthorized") toast("Could not load queue: " + e.message, "err"); }
