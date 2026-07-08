@@ -46,6 +46,8 @@ async def lifespan(_: FastAPI):
     init_db()
     scheduler = build_scheduler()
     scheduler.start()
+    for job in scheduler.get_jobs():
+        print(f"Scheduler job {job.id} next run at {job.next_run_time}")
     try:
         yield
     finally:
