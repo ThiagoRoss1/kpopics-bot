@@ -53,6 +53,18 @@
             "name_tags": "#HONGEUNCHAE",
             "group": "le sserafim",
             "kpopping_url": "https://kpopping.com/profiles/idol/Hong-Eunchae"
+        },
+        "jihyo": {
+            "idol_names": ["Jihyo", "지효", "ジヒョ"],
+            "name_tags": "#JIHYO",
+            "group": "twice",
+            "kpopping_url": "https://kpopping.com/profiles/idol/Jihyo"
+        },
+        "momo": {
+            "idol_names": ["Momo", "모모", "モモ"],
+            "name_tags": "#MOMO",
+            "group": "twice",
+            "kpopping_url": "https://kpopping.com/profiles/idol/Momo"
         }
     },
 
@@ -64,6 +76,10 @@
         "le sserafim": {
             "group_names": ["LE SSERAFIM", "르세라핌", "ルセラフィム"],
             "group_tags": "#LE_SSERAFIM"
+        },
+        "twice": {
+            "group_names": ["TWICE", "트와이스", "トゥワイス"],
+            "group_tags": "#TWICE"
         }
     }
 }
