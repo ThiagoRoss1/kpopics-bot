@@ -5,7 +5,7 @@ import io
 import os
 from utils.sorter import priority_sort
 from scripts.init_db import init_db
-from utils.database_operations import log_posted_image, get_log_history, get_last_posted_image, get_approved_photos, set_photo_posted
+from utils.database_operations import log_posted_image, get_log_history, get_last_posted_image, get_approved_photos, set_photo_posted, set_photo_rejected
 from utils.image import ensure_uploadable_image
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -155,19 +155,26 @@ class KpopBot:
         
         media_data = []
 
-        try:
-            for filename in post_pack:
-                print(f"Downloading image {filename['key']}...")
-                response_object = self.s3.get_object(Bucket=BUCKET_NAME, Key=filename['key'])
-                image_data = response_object['Body'].read()
-                print(f"Image {filename['key']} downloaded successfully from R2.")
-                media_data.append((filename, image_data))
-            
-            return media_data
-    
-        except Exception as e:
-            print(f"Error downloading images from Cloudflare R2: {e}")
-            return None
+
+        for filename in post_pack:
+            try:
+                for filename in post_pack:
+                    print(f"Downloading image {filename['key']}...")
+                    response_object = self.s3.get_object(Bucket=BUCKET_NAME, Key=filename['key'])
+                    image_data = response_object['Body'].read()
+                    print(f"Image {filename['key']} downloaded successfully from R2.")
+                    media_data.append((filename, image_data))
+
+            except self.s3.exceptions.NoSuchKey:
+                print(f"Image {filename['key']} not found in R2. Retiring stale photo {filename.get('id')}.")
+                if filename.get('id'):
+                    set_photo_rejected(filename['id'], reviewed_by="auto-missing")
+
+            except Exception as e:
+                print(f"Error downloading images from Cloudflare R2: {e}")
+                return None
+
+        return media_data or None
 
     def _upload_media(self):
         media_data = self._download_image()
