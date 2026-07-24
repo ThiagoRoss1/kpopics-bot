@@ -6,6 +6,7 @@ import os
 from utils.sorter import priority_sort
 from scripts.init_db import init_db
 from utils.database_operations import log_posted_image, get_log_history, get_last_posted_image, get_approved_photos, set_photo_posted
+from utils.image import ensure_uploadable_image
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -179,8 +180,10 @@ class KpopBot:
         try:
             for filename, image_data in media_data:
                 post_date = get_current_date()
+                image_data, new_ext = ensure_uploadable_image(image_data)
+                upload_name = filename['key'] if not new_ext else filename['key'].rsplit('.', 1)[0] + '.' + new_ext
                 media = self.api_v1.media_upload(
-                    filename=filename['key'], 
+                    filename=upload_name, 
                     file=io.BytesIO(image_data)
                 )
                 media_ids.append(media.media_id)
