@@ -138,8 +138,14 @@ class KpopBot:
                 post_pack = [file for file in self.idols_list
                              if file.get('combo') == file_name.get('combo')
                              and file.get('idols') == file_name.get('idols')]
+                seen_ids = set()
+                deduped_post_pack = []
+                for file in post_pack:
+                    if file['id'] not in seen_ids:
+                        seen_ids.add(file['id'])
+                        deduped_post_pack.append(file)
 
-                return sorted(post_pack, key=lambda x: int(x.get('copies') or 0))[:4]
+                return sorted(deduped_post_pack, key=lambda x: int(x.get('copies') or 0))[:4]
 
             return [file_name]
 
@@ -158,12 +164,11 @@ class KpopBot:
 
         for filename in post_pack:
             try:
-                for filename in post_pack:
-                    print(f"Downloading image {filename['key']}...")
-                    response_object = self.s3.get_object(Bucket=BUCKET_NAME, Key=filename['key'])
-                    image_data = response_object['Body'].read()
-                    print(f"Image {filename['key']} downloaded successfully from R2.")
-                    media_data.append((filename, image_data))
+                print(f"Downloading image {filename['key']}...")
+                response_object = self.s3.get_object(Bucket=BUCKET_NAME, Key=filename['key'])
+                image_data = response_object['Body'].read()
+                print(f"Image {filename['key']} downloaded successfully from R2.")
+                media_data.append((filename, image_data))
 
             except self.s3.exceptions.NoSuchKey:
                 print(f"Image {filename['key']} not found in R2. Retiring stale photo {filename.get('id')}.")
@@ -171,8 +176,8 @@ class KpopBot:
                     set_photo_rejected(filename['id'], reviewed_by="auto-missing")
 
             except Exception as e:
-                print(f"Error downloading images from Cloudflare R2: {e}")
-                return None
+                print(f"Error downloading images {filename['key']} from Cloudflare R2: {e}")
+                continue
 
         return media_data or None
 
