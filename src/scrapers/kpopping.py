@@ -39,6 +39,22 @@ def fetch_album(url):
         print(f"Error fetching {url}: {e}.")
         return None
 
+def fetch_album_json(url):
+    # Album pages (/kpics/<slug>) now sit behind a Cloudflare JS challenge (403 "Just a moment..."),
+    # but the JSON API at /api/kpics/<slug> is not challenged and carries the full album:
+    # albumImages (every photo) + taggedIdols (member names). Same slug, no HTML needed.
+    try:
+        response = requests.get(API_KPICS + "/" + _album_id_from_url(url), headers=HEADERS, timeout=25)
+        if response.status_code != 200:
+            print(f"Error fetching {url}: HTTP {response.status_code}.")
+            return None
+
+        return response.json()
+
+    except Exception as e:
+        print(f"Error fetching {url}: {e}.")
+        return None
+
 def _download_image(url):
     response = requests.get(url, headers=HEADERS, timeout=25)
     response.raise_for_status()
@@ -149,6 +165,33 @@ def parse_album(html, url):
         print(f"Error parsing album {url}: {e}.")
         return None
 
+def parse_album_json(data, url):
+    # JSON twin of parse_album -- returns the same dict shape, so callers swap in unchanged.
+    # Date still comes from the title's YYMMDD prefix only: photoDate falls back to the upload
+    # day for non-event albums, the same trap as the HTML page's datePublished.
+    try:
+        title = data.get("title")
+        names = []
+        for idol in data.get("taggedIdols") or []:
+            name = (idol.get("name") or "").strip()
+            if name and name not in names:
+                names.append(name)
+
+        images = sorted(data.get("albumImages") or [], key=lambda image: image.get("sortOrder", 0))
+        image_urls = [image["src"] for image in images if image.get("src")]
+
+        return {
+            "title": title,
+            "idol_names": names,
+            "date": _event_date_from_title(title),
+            "album_id": _album_id_from_url(url),
+            "image_urls": image_urls,
+        }
+
+    except Exception as e:
+        print(f"Error parsing album {url}: {e}.")
+        return None
+
 
 # --- Orchestrate ---
 
@@ -161,12 +204,13 @@ def scrape_album(url, limit=None):
 
     summary = {"album_id": _album_id_from_url(url), "ingested": 0, "skipped": 0, "rejected_reason": None}
 
-    html = fetch_album(url)
-    if html is None:
+    # Was fetch_album(url) + parse_album(html, url); the HTML page is now Cloudflare-challenged.
+    data = fetch_album_json(url)
+    if data is None:
         summary["rejected_reason"] = "fetch failed"
         return summary
 
-    parsed = parse_album(html, url)
+    parsed = parse_album_json(data, url)
     if parsed is None:
         summary["rejected_reason"] = "parse failed"
         return summary

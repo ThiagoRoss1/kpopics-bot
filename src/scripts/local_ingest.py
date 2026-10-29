@@ -17,8 +17,8 @@ load_dotenv(Path(__file__).resolve().parent / "local_ingest.env")
 # Pure, DB-free parsing/fetch helpers reused from the server scraper (no DB_FILE needed) + the R2
 # uploader. scrapers.kpopping's DB imports are now lazy, so importing it here triggers no DB.
 from scrapers.kpopping import (
-    fetch_album,
-    parse_album,
+    fetch_album_json,
+    parse_album_json,
     list_recent_album_urls,
     _download_image,
     _ext_from_url,
@@ -87,12 +87,13 @@ def ingest_album(url, limit=None):
     # /register (and locally here when there's no member tag at all).
     summary = {"album_id": None, "ingested": 0, "skipped": 0, "rejected_reason": None}
 
-    html = fetch_album(url)
-    if html is None:
+    # Was fetch_album(url) + parse_album(html, url); the HTML page is now Cloudflare-challenged.
+    data = fetch_album_json(url)
+    if data is None:
         summary["rejected_reason"] = "fetch failed"
         return summary
 
-    parsed = parse_album(html, url)
+    parsed = parse_album_json(data, url)
     if parsed is None:
         summary["rejected_reason"] = "parse failed"
         return summary
